@@ -1,0 +1,269 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.freefield.app/ffbundle/1/ffbundle.schema.json",
+  "title": "FreeField bundle manifest (freefield.bundle/1)",
+  "description": "Root schema validates manifest.json. Other bundle files are described by $defs: ElementsFile (data/elements.json), SheetElementIndex (data/sheets/<n>.json), DataTable (data/schedules/<slug>.json), SheetEmbedPayload (freefield-sheet.json attached to each sheet PDF).",
+  "type": "object",
+  "required": ["schema", "generator", "exportedAt", "project", "units", "coordinates", "models", "sheets", "schedules", "elementsFile", "stats"],
+  "properties": {
+    "schema": { "const": "freefield.bundle/1" },
+    "generator": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "host": { "type": "string", "description": "Authoring tool name." },
+        "hostVersion": { "type": "string" }
+      }
+    },
+    "exportedAt": { "type": "string", "format": "date-time" },
+    "project": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "number": { "type": "string" },
+        "sourceFile": { "type": "string" }
+      }
+    },
+    "units": {
+      "type": "object",
+      "required": ["length", "pdf"],
+      "properties": {
+        "length": { "const": "m", "description": "Model-space length unit (metres)." },
+        "pdf": { "const": "pt", "description": "PDF-space unit (points, origin top-left, y down)." }
+      }
+    },
+    "coordinates": {
+      "type": "object",
+      "required": ["modelSpace", "ifcPlacement"],
+      "properties": {
+        "modelSpace": { "const": "ifc", "description": "Transforms target IFC world coordinates exactly as written in the IFC." },
+        "ifcPlacement": { "enum": ["internal", "projectBasePoint", "surveyPoint", "shared"] },
+        "trueNorthRad": { "type": "number" }
+      }
+    },
+    "models": { "type": "array", "items": { "$ref": "#/$defs/ModelEntry" } },
+    "sheets": { "type": "array", "items": { "$ref": "#/$defs/SheetEntry" } },
+    "schedules": { "type": "array", "items": { "$ref": "#/$defs/ScheduleEntry" } },
+    "elementsFile": { "type": "string", "minLength": 1 },
+    "stats": {
+      "type": "object",
+      "required": ["elements", "sheets", "viewports", "links"],
+      "properties": {
+        "elements": { "type": "integer", "minimum": 0 },
+        "sheets": { "type": "integer", "minimum": 0 },
+        "viewports": { "type": "integer", "minimum": 0 },
+        "links": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "Number4": {
+      "type": "array", "items": { "type": "number" }, "minItems": 4, "maxItems": 4
+    },
+    "ModelEntry": {
+      "type": "object",
+      "required": ["id", "file", "storeys"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "file": { "type": "string", "pattern": "^models/[A-Za-z0-9._-]+\\.ifc$" },
+        "name": { "type": "string" },
+        "discipline": { "type": "string" },
+        "storeys": { "type": "array", "items": { "$ref": "#/$defs/StoreyEntry" } }
+      }
+    },
+    "StoreyEntry": {
+      "type": "object",
+      "required": ["name", "elevation"],
+      "properties": {
+        "name": { "type": "string", "description": "Equals IfcBuildingStorey.Name in the model." },
+        "elevation": { "type": "number", "description": "Metres." },
+        "levelUniqueId": { "type": "string" },
+        "ifcGlobalId": { "type": "string" }
+      }
+    },
+    "SheetEntry": {
+      "type": "object",
+      "required": ["id", "number", "name", "file", "data", "page", "viewports"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "number": { "type": "string" },
+        "name": { "type": "string" },
+        "file": { "type": "string", "pattern": "^sheets/[A-Za-z0-9._-]+\\.pdf$" },
+        "data": { "type": "string", "pattern": "^data/sheets/[A-Za-z0-9._-]+\\.json$" },
+        "page": {
+          "type": "object",
+          "required": ["widthPt", "heightPt"],
+          "properties": {
+            "widthPt": { "type": "number", "exclusiveMinimum": 0 },
+            "heightPt": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        },
+        "viewports": { "type": "array", "items": { "$ref": "#/$defs/ViewportEntry" } }
+      }
+    },
+    "ViewportEntry": {
+      "type": "object",
+      "required": ["id", "viewId", "viewName", "viewType", "scale", "primary", "pdfRegion", "pdfToModel"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "viewId": { "type": "string" },
+        "viewName": { "type": "string" },
+        "viewType": { "type": "string" },
+        "scale": { "type": "number", "exclusiveMinimum": 0, "description": "View scale denominator (96 means 1:96)." },
+        "modelId": { "type": ["string", "null"] },
+        "storeyName": { "type": ["string", "null"] },
+        "primary": { "type": "boolean", "description": "One primary viewport per (sheet, storey)." },
+        "pdfRegion": { "$ref": "#/$defs/Number4", "description": "[x0,y0,x1,y1] in points, top-left origin, y down." },
+        "pdfToModel": {
+          "description": "[a,b,c,d,e,f]: modelX=a*px+b*py+c; modelY=d*px+e*py+f. Null for non-plan viewports.",
+          "oneOf": [
+            { "type": "null" },
+            { "type": "array", "items": { "type": "number" }, "minItems": 6, "maxItems": 6 }
+          ]
+        },
+        "controlPoints": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/ControlPoint" },
+          "minItems": 2
+        }
+      },
+      "if": { "properties": { "pdfToModel": { "type": "array" } }, "required": ["pdfToModel"] },
+      "then": {
+        "required": ["modelId", "storeyName", "controlPoints"],
+        "properties": {
+          "modelId": { "type": "string", "minLength": 1 },
+          "storeyName": { "type": "string", "minLength": 1 },
+          "controlPoints": { "type": "array", "minItems": 2 }
+        }
+      }
+    },
+    "ControlPoint": {
+      "type": "object",
+      "required": ["pdfX", "pdfY", "modelX", "modelY"],
+      "properties": {
+        "pdfX": { "type": "number" }, "pdfY": { "type": "number" },
+        "modelX": { "type": "number" }, "modelY": { "type": "number" }
+      }
+    },
+    "ScheduleEntry": {
+      "type": "object",
+      "required": ["id", "name", "file"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "file": { "type": "string", "pattern": "^data/schedules/[A-Za-z0-9._-]+\\.json$" }
+      }
+    },
+    "ParamValue": {
+      "type": "object",
+      "properties": {
+        "v": { "type": ["string", "number", "boolean", "null"], "description": "Raw value." },
+        "d": { "type": ["string", "null"], "description": "Display string." },
+        "u": { "type": ["string", "null"], "description": "Unit." },
+        "t": { "type": "boolean", "description": "True when the parameter belongs to the element type." },
+        "k": { "type": ["string", "null"], "description": "Stable key: built-in parameter name, shared GUID or name." }
+      }
+    },
+    "ElementRecord": {
+      "type": "object",
+      "required": ["uid", "gid", "params"],
+      "properties": {
+        "uid": { "type": "string", "description": "Source element unique id." },
+        "eid": { "type": "integer", "description": "Source element numeric id." },
+        "gid": { "type": "string", "description": "IFC GlobalId." },
+        "category": { "type": "string" },
+        "bic": { "type": "string", "description": "Built-in category name." },
+        "family": { "type": "string" },
+        "type": { "type": "string" },
+        "level": { "type": "string" },
+        "modelId": { "type": "string" },
+        "params": { "type": "object", "additionalProperties": { "$ref": "#/$defs/ParamValue" } }
+      }
+    },
+    "ElementsFile": {
+      "type": "object",
+      "description": "data/elements.json: dictionary keyed by IFC GlobalId.",
+      "additionalProperties": { "$ref": "#/$defs/ElementRecord" }
+    },
+    "SheetElement": {
+      "type": "object",
+      "required": ["gid", "vp", "bbox"],
+      "properties": {
+        "gid": { "type": "string" },
+        "vp": { "type": "string", "description": "Viewport id." },
+        "bbox": { "$ref": "#/$defs/Number4" },
+        "outline": {
+          "type": "array",
+          "items": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 }
+        }
+      }
+    },
+    "SheetLink": {
+      "type": "object",
+      "required": ["kind", "bbox"],
+      "properties": {
+        "kind": { "enum": ["section", "elevation", "callout", "detail", "view"] },
+        "bbox": { "$ref": "#/$defs/Number4" },
+        "targetSheetId": { "type": ["string", "null"] },
+        "targetSheetNumber": { "type": ["string", "null"] },
+        "targetViewId": { "type": ["string", "null"] }
+      }
+    },
+    "SheetElementIndex": {
+      "type": "object",
+      "required": ["sheetId", "elements", "links"],
+      "properties": {
+        "sheetId": { "type": "string" },
+        "elements": { "type": "array", "items": { "$ref": "#/$defs/SheetElement" } },
+        "links": { "type": "array", "items": { "$ref": "#/$defs/SheetLink" } }
+      }
+    },
+    "DataColumn": {
+      "type": "object",
+      "required": ["heading", "paramKey", "fieldType"],
+      "properties": {
+        "heading": { "type": "string" },
+        "paramKey": { "type": "string" },
+        "fieldType": { "enum": ["instance", "type"] }
+      }
+    },
+    "DataRow": {
+      "type": "object",
+      "required": ["gid", "uid", "cells"],
+      "properties": {
+        "gid": { "type": "string" },
+        "uid": { "type": "string" },
+        "cells": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "DataTable": {
+      "type": "object",
+      "required": ["name", "columns", "rows"],
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "columns": { "type": "array", "items": { "$ref": "#/$defs/DataColumn" } },
+        "rows": { "type": "array", "items": { "$ref": "#/$defs/DataRow" } }
+      }
+    },
+    "SheetEmbedPayload": {
+      "type": "object",
+      "description": "freefield-sheet.json attached to each sheet PDF.",
+      "required": ["schema", "sheetId", "index", "elements"],
+      "properties": {
+        "schema": { "const": "freefield.sheet/1" },
+        "sheetId": { "type": "string" },
+        "sheetNumber": { "type": "string" },
+        "sheetName": { "type": "string" },
+        "page": { "type": "object" },
+        "viewports": { "type": "array", "items": { "$ref": "#/$defs/ViewportEntry" } },
+        "index": { "$ref": "#/$defs/SheetElementIndex" },
+        "elements": { "$ref": "#/$defs/ElementsFile" }
+      }
+    }
+  }
+}
