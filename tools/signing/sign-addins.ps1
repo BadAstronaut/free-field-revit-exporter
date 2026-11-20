@@ -4,7 +4,7 @@
   without the "Unsigned add-in / Load once / Always load" security prompt.
 
 .DESCRIPTION
-  -Setup   (once per machine/user) creates a self-signed code-signing certificate
+  -Setup   (once per machine/user, then also signs the DLLs) creates a self-signed code-signing certificate
            "CN=FreeField Exporter Dev" in Cert:\CurrentUser\My (private key not exportable) and
            trusts its public part in CurrentUser\TrustedPublisher and CurrentUser\Root.
            Windows shows ONE confirmation dialog for the Root import: click "Yes".
@@ -60,7 +60,7 @@ if ($Setup) {
     } else { "already trusted in $store" }
   }
   Remove-Item $cer -ErrorAction SilentlyContinue
-  return
+  # fall through: sign the default DLLs right away so one command fixes the prompt
 }
 
 $cert = Get-SigningCert
