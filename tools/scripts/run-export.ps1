@@ -9,7 +9,7 @@
 #>
 param(
   [Parameter(Mandatory)][string]$Rvt,
-  [string]$Output = (Join-Path $env:LOCALAPPDATA "FreeFieldExporter\out"),
+  [string]$Output,
   [int]$RevitVersion = 2025,
   [string]$Mode = "export",
   [string[]]$Sheets,
@@ -22,7 +22,7 @@ $work = Join-Path $env:LOCALAPPDATA "FreeFieldExporter\jobs-run"
 New-Item -ItemType Directory -Force $work | Out-Null
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 # Never reuse or delete earlier outputs: default to a fresh timestamped folder; an explicit -Output is a folder that is only added to.
-if (-not $Output) { $Output = Join-Path $env:LOCALAPPDATA "FreeFieldExporteroutun-$stamp" }
+if (-not $Output) { $Output = Join-Path (Join-Path $env:LOCALAPPDATA "FreeFieldExporterout") "run-$stamp" }
 $job = Join-Path $work "job-$stamp.json"
 $res = Join-Path $work "result-$stamp.json"
 $obj = [ordered]@{ mode = $Mode; rvt = (Resolve-Path $Rvt).Path; output = $Output; sheets = $(if ($Sheets) { $Sheets } else { $null });
