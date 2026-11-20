@@ -13,6 +13,7 @@ public sealed class ExportDialog : Window
     readonly List<(CheckBox Box, string Number)> _sheets = new();
     readonly List<(CheckBox Box, long Id)> _views = new();
     readonly CheckBox _includeSchedules = new() { Content = "Include schedules", IsChecked = true };
+    readonly CheckBox _outlines = new() { Content = "Include element outlines", IsChecked = true, Margin = new Thickness(12, 0, 0, 0) };
     readonly ComboBox _ifc = new() { Width = 180 };
     readonly TextBox _out = new() { MinWidth = 380 };
     readonly ProgressBar _bar = new() { Height = 16, Minimum = 0, Maximum = 100 };
@@ -53,7 +54,7 @@ public sealed class ExportDialog : Window
         root.Children.Add(Header("Options"));
         _ifc.Items.Add("IFC4 Reference View"); _ifc.Items.Add("IFC2x3 Coordination View 2.0"); _ifc.SelectedIndex = 0;
         var row = new StackPanel { Orientation = Orientation.Horizontal };
-        row.Children.Add(_includeSchedules); row.Children.Add(new TextBlock { Text = "   IFC: ", VerticalAlignment = VerticalAlignment.Center }); row.Children.Add(_ifc);
+        row.Children.Add(_includeSchedules); row.Children.Add(_outlines); row.Children.Add(new TextBlock { Text = "   IFC: ", VerticalAlignment = VerticalAlignment.Center }); row.Children.Add(_ifc);
         root.Children.Add(row);
         _out.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "FreeField");
         var orow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
@@ -72,14 +73,18 @@ public sealed class ExportDialog : Window
 
     static TextBlock Header(string t) => new() { Text = t, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 10, 0, 4) };
 
-    void OnExport(object? s, RoutedEventArgs e)
+    public string OutputFolder { get => _out.Text; set => _out.Text = value; }
+    public string StatusText => _status.Text;
+
+    /// <summary>The export path the Export button uses (also used by the headless dialog smoke test). Throws on failure.</summary>
+    public ExportResult RunExport(bool openFolder)
     {
         var selSheets = _sheets.Where(x => x.Box.IsChecked == true).Select(x => x.Number).ToHashSet();
         var selViews = _views.Where(x => x.Box.IsChecked == true).Select(x => x.Id).ToHashSet();
         var opt = new ExportOptions
         {
             Sheets = selSheets, PlanViews = selViews, IncludeSheets = selSheets.Count > 0, IncludePlanViewsNotOnSheets = selViews.Count > 0,
-            IncludeSchedules = _includeSchedules.IsChecked == true, IfcVersion = _ifc.SelectedIndex == 0 ? "IFC4RV" : "IFC2x3CV2", OutputPath = _out.Text,
+            IncludeSchedules = _includeSchedules.IsChecked == true, IncludeOutlines = _outlines.IsChecked == true, IfcVersion = _ifc.SelectedIndex == 0 ? "IFC4RV" : "IFC2x3CV2", OutputPath = _out.Text,
         };
         _go.IsEnabled = false; _close.IsEnabled = false;
         try
@@ -91,9 +96,15 @@ public sealed class ExportDialog : Window
             });
             _status.Text = $"Done: {r.Sheets} sheets, {r.Viewports} viewports, {r.Elements} elements, {r.Links} links, {r.Schedules} schedules" +
                            (r.Warnings.Count > 0 ? $" ({r.Warnings.Count} warnings, see log)" : "") + "\n" + r.BundlePath;
-            try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{r.BundlePath}\""); } catch { }
+            if (openFolder) { try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{r.BundlePath}\""); } catch { } }
+            return r;
         }
-        catch (Exception ex) { _status.Text = "Failed: " + ex.Message; Automation.Log.Write("export failed: " + ex); }
         finally { _go.IsEnabled = true; _close.IsEnabled = true; }
+    }
+
+    void OnExport(object? s, RoutedEventArgs e)
+    {
+        try { RunExport(true); }
+        catch (Exception ex) { _status.Text = "Failed: " + ex.Message; Automation.Log.Write("export failed: " + ex); }
     }
 }

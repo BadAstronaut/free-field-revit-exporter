@@ -9,7 +9,7 @@ public sealed class ExportOptions
     public bool IncludeSheets { get; set; } = true;
     public bool IncludePlanViewsNotOnSheets { get; set; } = true;
     public bool IncludeSchedules { get; set; } = true;
-    public bool IncludeOutlines { get; set; } = false;
+    public bool IncludeOutlines { get; set; } = true;
     public string IfcVersion { get; set; } = "IFC4RV";   // IFC4RV | IFC2x3CV2
     public string OutputPath { get; set; } = "";         // .ffbundle file or folder
     public string? Discipline { get; set; }

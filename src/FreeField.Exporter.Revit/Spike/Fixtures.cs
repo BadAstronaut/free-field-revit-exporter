@@ -26,6 +26,57 @@ public static class Fixtures
             made.Add(sh.SheetNumber + "=" + v.Name);
         }
         t.Commit();
+        made.AddRange(CreateFixtureSchedules(doc));
+        return made;
+    }
+
+    static readonly BuiltInParameter[][] FramingFields =
+    {
+        new[] { BuiltInParameter.ALL_MODEL_MARK },
+        new[] { BuiltInParameter.ELEM_FAMILY_AND_TYPE_PARAM },
+        new[] { BuiltInParameter.INSTANCE_LENGTH_PARAM, BuiltInParameter.CURVE_ELEM_LENGTH },
+        new[] { BuiltInParameter.INSTANCE_REFERENCE_LEVEL_PARAM },
+        new[] { BuiltInParameter.STRUCTURAL_MATERIAL_PARAM },
+    };
+    static readonly BuiltInParameter[][] ColumnFields =
+    {
+        new[] { BuiltInParameter.ALL_MODEL_MARK },
+        new[] { BuiltInParameter.ELEM_FAMILY_AND_TYPE_PARAM },
+        new[] { BuiltInParameter.FAMILY_BASE_LEVEL_PARAM },
+        new[] { BuiltInParameter.FAMILY_TOP_LEVEL_PARAM },
+        new[] { BuiltInParameter.STRUCTURAL_MATERIAL_PARAM },
+    };
+
+    /// <summary>Deterministic schedules: 'FF Structural Framing Schedule' (placed on sheet FF-101) and 'FF Structural Column Schedule'.</summary>
+    static List<string> CreateFixtureSchedules(Document doc)
+    {
+        var made = new List<string>();
+        using var t = new Transaction(doc, "FF fixture schedules");
+        t.Start();
+        ViewSchedule? Make(string name, BuiltInCategory cat, BuiltInParameter[][] fields)
+        {
+            var existing = new FilteredElementCollector(doc).OfClass(typeof(ViewSchedule)).Cast<ViewSchedule>().FirstOrDefault(s => s.Name == name);
+            if (existing != null) return existing;
+            var s = ViewSchedule.CreateSchedule(doc, new ElementId(cat));
+            s.Name = name;
+            var sf = s.Definition.GetSchedulableFields();
+            foreach (var alts in fields)
+            {
+                var sfield = alts.Select(a => sf.FirstOrDefault(x => x.ParameterId.Value == (long)a)).FirstOrDefault(x => x != null);
+                if (sfield != null) s.Definition.AddField(sfield);
+            }
+            made.Add(name + " (" + s.Definition.GetFieldCount() + " fields)");
+            return s;
+        }
+        var framing = Make("FF Structural Framing Schedule", BuiltInCategory.OST_StructuralFraming, FramingFields);
+        Make("FF Structural Column Schedule", BuiltInCategory.OST_StructuralColumns, ColumnFields);
+        var sheet = new FilteredElementCollector(doc).OfClass(typeof(ViewSheet)).Cast<ViewSheet>().FirstOrDefault(s => s.SheetNumber == "FF-101");
+        if (framing != null && sheet != null && !new FilteredElementCollector(doc, sheet.Id).OfClass(typeof(ScheduleSheetInstance)).Any())
+        {
+            ScheduleSheetInstance.Create(doc, sheet.Id, framing.Id, new XYZ(0.05, 0.9, 0));
+            made.Add("framing schedule placed on FF-101");
+        }
+        t.Commit();
         return made;
     }
 }

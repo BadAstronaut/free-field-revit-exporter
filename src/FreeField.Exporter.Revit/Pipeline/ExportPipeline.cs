@@ -37,6 +37,7 @@ public static class ExportPipeline
             Sheets = job.Sheets == null ? null : new HashSet<string>(job.Sheets),
             IfcVersion = job.Opt("ifcVersion", "IFC4RV"),
             IncludeSchedules = job.Opt("schedules", "true") != "false",
+            IncludeOutlines = job.Opt("outlines", "true") != "false",
             IncludeSheets = job.Opt("includeSheets", "true") != "false",
             IncludePlanViewsNotOnSheets = job.Opt("planViews", "true") != "false",
             OutputPath = job.Output ?? "",
@@ -44,7 +45,16 @@ public static class ExportPipeline
             Discipline = job.Options != null && job.Options.TryGetValue("discipline", out var d) ? d : null,
         };
         if (job.Opt("createFixtureSheets") == "true") result["fixture"] = Spike.Fixtures.CreateFixtureSheets(uidoc.Document, int.Parse(job.Opt("fixtureCount", "9999")));
-        var r = Export(uidoc.Document, opt, (p, m) => Log.Write($"[{p}%] {m}"));
+        ExportResult r;
+        if (job.Opt("dialogSmoke") == "true")
+        {
+            // Exercises the UI code path: construct the dialog, keep its default selections, run what the Export button runs, close.
+            var dlg = new ExportDialog(uidoc.Document) { OutputFolder = job.Output ?? "" };
+            r = dlg.RunExport(false);
+            result["dialogSmoke"] = dlg.StatusText;
+            dlg.Close();
+        }
+        else r = Export(uidoc.Document, opt, (p, m) => Log.Write($"[{p}%] {m}"));
         result["bundle"] = r.BundlePath; result["timingsMs"] = r.TimingsMs; result["warnings"] = r.Warnings;
         result["counts"] = new { r.Sheets, r.Viewports, r.Elements, r.Links, r.Schedules, r.PlanViewPages };
     }
@@ -166,8 +176,15 @@ public static class ExportPipeline
 
                 // 6. schedules
                 var schedules = new List<(ScheduleEntry, DataTable)>();
+                var placedMap = new Dictionary<long, List<string>>();
+                foreach (var pg in pages.Where(x => !x.Temp))
+                    foreach (var ssi in new FilteredElementCollector(doc, pg.Sheet.Id).OfClass(typeof(ScheduleSheetInstance)).Cast<ScheduleSheetInstance>())
+                    {
+                        if (!placedMap.TryGetValue(ssi.ScheduleId.Value, out var l)) placedMap[ssi.ScheduleId.Value] = l = new List<string>();
+                        if (!l.Contains(pg.Id)) l.Add(pg.Id);
+                    }
                 if (tg != null) { tg.RollBack(); tg = null; }
-                if (opt.IncludeSchedules) { progress(86, "Schedules"); schedules = ScheduleExporter.Export(doc, ifc.GlobalIds, records, rb, Warn); }
+                if (opt.IncludeSchedules) { progress(86, "Schedules"); schedules = ScheduleExporter.Export(doc, ifc.GlobalIds, records, rb, Warn, placedMap); }
                 Stage("schedules");
 
                 // 7. manifest + bundle
@@ -267,7 +284,7 @@ public static class ExportPipeline
                     if (pb.MaxX < region.MinX || pb.MinX > region.MaxX || pb.MaxY < region.MinY || pb.MinY > region.MaxY) continue;
                     if (!seen.Add((gid, ve.Id))) continue;
                     if (!records.ContainsKey(gid)) records[gid] = rb.Build(e, gid);
-                    index.Elements.Add(new SheetElement { Gid = gid, Vp = ve.Id, Bbox = pb.ToArray() });
+                    index.Elements.Add(new SheetElement { Gid = gid, Vp = ve.Id, Bbox = pb.ToArray(), Outline = isPlan && opt.IncludeOutlines ? Outlines.Build(e, map) : null });
                 }
                 catch { }
             }

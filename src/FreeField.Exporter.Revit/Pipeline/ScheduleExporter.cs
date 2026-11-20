@@ -7,7 +7,7 @@ namespace FreeField.Exporter.Revit.Pipeline;
 public static class ScheduleExporter
 {
     public static List<(ScheduleEntry, DataTable)> Export(Document doc, HashSet<string> ifcGids, Dictionary<string, ElementRecord> records,
-        RecordBuilder rb, Action<string> warn)
+        RecordBuilder rb, Action<string> warn, Dictionary<long, List<string>>? placed = null)
     {
         var res = new List<(ScheduleEntry, DataTable)>();
         foreach (var s in new FilteredElementCollector(doc).OfClass(typeof(ViewSchedule)).Cast<ViewSchedule>())
@@ -57,7 +57,9 @@ public static class ScheduleExporter
                     table.Rows.Add(row); rowsOut++;
                 }
                 warn($"schedule '{s.Name}': {rowsOut} rows, {bound} bound to elements");
-                res.Add((new ScheduleEntry { Id = s.UniqueId, Name = s.Name, Category = catName }, table));
+                var se = new ScheduleEntry { Id = s.UniqueId, Name = s.Name, Category = catName };
+                if (placed != null && placed.TryGetValue(s.Id.Value, out var onSheets)) se.PlacedOnSheetIds.AddRange(onSheets);
+                res.Add((se, table));
             }
             catch (Exception ex) { warn($"schedule '{s.Name}' failed: {ex.Message}"); }
         }
