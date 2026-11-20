@@ -13,3 +13,9 @@ User directive. Add-in defaults to RevitVersion=2025 (net8.0-windows). Revit MCP
 
 ## 2026-11-20 — PDFsharp pinned to 6.2.4 (MIT)
 PDFsharp 6.5.0 is AGPL-3.0 and enforces a license key at runtime (`PdfSharpLicenseException` on `new PdfDocument()`). 6.2.4 is the last MIT release; Core pins `PDFsharp` 6.2.4. Do not bump to 6.5+ without a licensing decision.
+
+## 2026-11-20 — BIM properties read from PDF attachment, not a DB table
+FreeField reads `freefield-sheet.json` embedded in each PDF via pdf.js getAttachments at view time. Avoids a Dexie v12 migration, Firestore 1MB doc limits and sync changes; data travels with the PDF blob.
+
+## 2026-11-20 — Model space = IFC as authored (Z-up); FreeField world = (X+bx, Z+by, -Y+bz)
+Verified by ff-analyst. Importer must support rotated calibrations in the overlay (currently axis-aligned only) and fix LinkView floorZ by adding by.

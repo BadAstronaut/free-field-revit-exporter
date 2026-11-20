@@ -94,9 +94,17 @@ File names: sanitize sheet numbers (`[^A-Za-z0-9._-]` → `_`), keep original in
 ```
 **Coordinate contract (most important rule in this project):**
 - PDF space: points, origin top-left of the page, y down (pdf.js convention FreeField uses).
-- Model space: IFC world coordinates in metres as web-ifc computes them with `COORDINATE_TO_ORIGIN: false`.
+- Model space: IFC world coordinates in metres **as authored (Z-up)**: modelX = IFC X, modelY = IFC Y, i.e. Revit internal
+  coords x 0.3048 with internal-origin placement. NOTE: web-ifc emits Y-up vertices as (X, Z, -Y), so tools comparing
+  against web-ifc geometry must use modelX = vx, modelY = -vz (amended 2026-11-20, see docs/freefield-integration.md).
 - `pdfToModel` is a general 2×3 affine (it contains a reflection, because PDF y-down vs model y-up). Non-plan
   viewports (sections/elevations/drafting) get `pdfToModel: null` and no `storeyName`.
+- FreeField world (verified): worldX = modelX + bx, worldZ = -modelY + bz, worldY = modelZ + by, where b = the coordinate
+  shift stored in the building's base-model .frag (`getCoordinates()`). The y negation removes the reflection, so the
+  calibration is a proper similarity.
+- BIM properties in FreeField are read from the PDF's embedded `freefield-sheet.json` (pdf.js getAttachments) — no new
+  DB table. The embedded JSON must therefore be self-sufficient: SheetElementIndex + referenced ElementRecords + sheet
+  id/number + link targets (sheet number AND id).
 - FreeField converts model XY → its world X/Z with its own convention and fits its similarity transform from the two
   `controlPoints` (it already has `computeSimilarityTransform`). The exporter never emits FreeField world coords.
 
