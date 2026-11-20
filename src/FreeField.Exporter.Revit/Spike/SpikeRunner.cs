@@ -31,6 +31,8 @@ public static class SpikeRunner
                     case "list": Save(outDir, "spike-list.json", List(doc)); break;
                     case "rotvp": Save(outDir, "spike-rotvp.json", RotVp(doc)); break;
                     case "viewpdf": Save(outDir, "spike-viewpdf-" + job.Opt("viewId") + ".json", ViewPdf(doc, job, outDir)); break;
+                    case "viewelems": Save(outDir, "spike-viewelems.json", ViewElems(doc, job)); break;
+                    case "dialog": { var dlg = new ExportDialog(doc); dlg.Show(); dlg.Close(); Save(outDir, "spike-dialog.json", new { ok = true }); break; }
                     case "views": Save(outDir, "spike-views.json", Views(doc)); break;
                     case "mksheets": Save(outDir, "spike-mksheets.json", MakeSheets(doc, job, outDir)); break;
                     case "pdf": Save(outDir, "spike-pdf-" + job.Opt("sheet", "x") + ".json", Pdf(doc, job, outDir)); break;
@@ -212,6 +214,19 @@ public static class SpikeRunner
         var crop = v.CropBox; var ct = crop.Transform;
         var cc = new[] { crop.Min, new XYZ(crop.Max.X, crop.Min.Y, 0), crop.Max, new XYZ(crop.Min.X, crop.Max.Y, 0) }.Select(q => P(tf0.OfPoint(ct.OfPoint(q)))).ToList();
         return new { view = v.Name, id = v.Id.Value, scale = v.Scale, ok, pdf = final, cropActive = v.CropBoxActive, annoCrop = v.get_Parameter(BuiltInParameter.VIEWER_ANNOTATION_CROP_ACTIVE)?.AsInteger(), cropCornersProj = cc, pts };
+    }
+
+    static object ViewElems(Document doc, Job job)
+    {
+        var res = new Dictionary<string, object>();
+        foreach (var idStr in job.Opt("viewIds").Split(','))
+        {
+            var v = (View)doc.GetElement(new ElementId(long.Parse(idStr)));
+            var g = new FilteredElementCollector(doc, v.Id).WhereElementIsNotElementType().GroupBy(e => (e.Category?.Name ?? "-") + " | " + e.GetType().Name).ToDictionary(x => x.Key, x => x.Count());
+            res[v.Name] = g;
+        }
+        var secs = new FilteredElementCollector(doc).OfClass(typeof(View)).Cast<View>().Where(v => v.ViewType is ViewType.Section or ViewType.Elevation or ViewType.Detail || v.IsCallout).Select(v => v.Name + " | " + v.ViewType + " | callout=" + v.IsCallout + " | id=" + v.Id.Value).ToList();
+        return new { res, secs, markers = new FilteredElementCollector(doc).OfClass(typeof(ElevationMarker)).Select(m => m.Id.Value).ToList() };
     }
 
     static object Views(Document doc)

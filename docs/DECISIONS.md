@@ -19,3 +19,9 @@ FreeField reads `freefield-sheet.json` embedded in each PDF via pdf.js getAttach
 
 ## 2026-11-20 — Model space = IFC as authored (Z-up); FreeField world = (X+bx, Z+by, -Y+bz)
 Verified by ff-analyst. Importer must support rotated calibrations in the overlay (currently axis-aligned only) and fix LinkView floorZ by adding by.
+
+## 2026-11-20 — Plan views not on sheets use a temporary no-titleblock sheet
+Direct view PDF export sizes the page to the ink bbox (not derivable). The exporter puts such views on a temporary sheet (TransactionGroup, rolled back) so the proven sheet->page formula applies. Synthetic page number `VIEW-<sanitized view name>`, sheet id `view:<view UniqueId>`.
+
+## 2026-11-20 — IFC file units
+Revit writes IFC in the project length unit (FOOT for imperial projects). Coordinates remain exactly Revit internal * 0.3048 m after the unit conversion that web-ifc applies; no API change needed.
