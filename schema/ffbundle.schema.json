@@ -266,6 +266,11 @@
         "links": {
           "type": "array",
           "items": { "$ref": "#/$defs/SheetLink" }
+        },
+        "schedules": {
+          "type": "array",
+          "description": "Schedules placed on this sheet (optional).",
+          "items": { "$ref": "#/$defs/DataTable" }
         }
       }
     }

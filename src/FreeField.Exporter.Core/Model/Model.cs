@@ -111,6 +111,8 @@ public sealed class ScheduleEntry
     [JsonPropertyName("name")] public string Name { get; set; } = "";
     [JsonPropertyName("category")] public string Category { get; set; } = "";
     [JsonPropertyName("file")] public string File { get; set; } = "";
+    /// <summary>Sheet ids on which this schedule is placed (not serialized in the manifest; used to embed the table in those sheets PDF payloads).</summary>
+    [JsonIgnore] public List<string> PlacedOnSheetIds { get; set; } = new();
 }
 
 public sealed class BundleStats
@@ -150,6 +152,8 @@ public sealed class SheetElementIndex
     [JsonPropertyName("sheetId")] public string SheetId { get; set; } = "";
     [JsonPropertyName("elements")] public List<SheetElement> Elements { get; set; } = new();
     [JsonPropertyName("links")] public List<SheetLink> Links { get; set; } = new();
+    /// <summary>Schedules placed on this sheet (optional).</summary>
+    [JsonPropertyName("schedules")] public List<DataTable>? Schedules { get; set; }
 }
 
 public sealed class SheetElement
@@ -212,4 +216,6 @@ public sealed class EmbeddedSheetPayload
     [JsonPropertyName("elementRecords")] public Dictionary<string, ElementRecord> ElementRecords { get; set; } = new();
     /// <summary>Links, with targetSheetId and targetSheetNumber.</summary>
     [JsonPropertyName("links")] public List<SheetLink> Links { get; set; } = new();
+    /// <summary>Schedules placed on this sheet (optional).</summary>
+    [JsonPropertyName("schedules")] public List<DataTable>? Schedules { get; set; }
 }

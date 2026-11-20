@@ -99,7 +99,7 @@ public class BundleRoundTripTests
         {
             w.AddModelFile("arch", ifc);
             w.AddSheetPdf(m.Sheets[0], pdf);
-            w.Write(m, els, idx, new[] { (new ScheduleEntry { Id = "s1", Name = "Door Schedule", Category = "Doors" }, sched) });
+            w.Write(m, els, idx, new[] { (new ScheduleEntry { Id = "s1", Name = "Door Schedule", Category = "Doors", PlacedOnSheetIds = { m.Sheets[0].Id } }, sched) });
         }
         Assert.True(File.Exists(bundle));
         Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(bundle)!, "*.tmp"));
@@ -150,6 +150,8 @@ public class BundleRoundTripTests
         Assert.Equal(6, emb["viewports"]![0]!["pdfToModel"]!.AsArray().Count);
         Assert.Equal("sheet-2-target", (string?)emb["links"]![0]!["targetSheetId"]);
         Assert.Equal("A201", (string?)emb["links"]![0]!["targetSheetNumber"]);
+        Assert.Equal("Door Schedule", (string?)emb["schedules"]![0]!["name"]);
+        Assert.Equal("D1", (string?)emb["schedules"]![0]!["rows"]![0]!["cells"]![0]);
         Assert.True(JsonTests.Validate("EmbeddedSheetPayload", emb.ToJsonString()).IsValid);
     }
 

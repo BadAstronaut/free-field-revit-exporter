@@ -59,6 +59,8 @@ public sealed class BundleWriter : IDisposable
             modelPaths.Add((m.File, _models[m.Id]));
         }
 
+        var schedList = (schedules ?? Array.Empty<(ScheduleEntry, DataTable)>()).ToList();
+
         // --- sheets
         _tempDir = Path.Combine(Path.GetTempPath(), "ffbundle-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_tempDir);
@@ -93,6 +95,8 @@ public sealed class BundleWriter : IDisposable
             };
             foreach (var e in idx.Elements)
                 if (elements.TryGetValue(e.Gid, out var rec)) payload.ElementRecords[e.Gid] = rec;
+            var placed = schedList.Where(x => x.Item1.PlacedOnSheetIds.Contains(s.Id)).Select(x => x.Item2).ToList();
+            if (placed.Count > 0) payload.Schedules = placed;
 
             PdfTools.EmbedJson(tmpPdf, SheetAttachmentName, BundleJson.SerializeToUtf8(payload), new Dictionary<string, string>
             {
@@ -111,7 +115,7 @@ public sealed class BundleWriter : IDisposable
         var usedSlugs = new HashSet<string>();
         var schedFiles = new List<(string Entry, byte[] Json)>();
         manifest.Schedules = new List<ScheduleEntry>();
-        foreach (var (entry, table) in schedules ?? Array.Empty<(ScheduleEntry, DataTable)>())
+        foreach (var (entry, table) in schedList)
         {
             var slug = BundleNaming.MakeUnique(BundleNaming.Slug(entry.Name), usedSlugs);
             entry.File = $"data/schedules/{slug}.json";

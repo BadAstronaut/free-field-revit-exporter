@@ -156,4 +156,5 @@ export interface EmbeddedSheetPayload {
   elements: SheetElement[]; // the SheetElementIndex entries
   elementRecords: ElementsFile; // records referenced by `elements`, keyed by gid
   links: SheetLink[]; // with targetSheetId and targetSheetNumber
+  schedules?: DataTable[]; // schedules placed on this sheet
 }
