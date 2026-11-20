@@ -7,3 +7,6 @@ Manifest transforms target IFC world coords. Exporting relative to internal orig
 
 ## 2026-11-20 — pdfToModel is a general affine + 2 control points
 PDF y-down vs model y-up implies a reflection, which a similarity (scale+rotation) cannot express. The importer fits its own similarity from the control points after converting model XY to its world convention.
+
+## 2026-11-20 — Primary test target: Revit 2025 + STRUCTURAL_CO.rvt
+User directive. Add-in defaults to RevitVersion=2025 (net8.0-windows). Revit MCP harness gets built/installed for 2025 for verification. Plan viewport types widened to FloorPlan/EngineeringPlan/CeilingPlan/AreaPlan for the structural model.

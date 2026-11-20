@@ -37,8 +37,8 @@ schema/ffbundle.schema.json        JSON Schema (draft 2020-12) for manifest.json
 schema/ffbundle.d.ts               TS types mirroring the schema (FreeField copies this)
 src/FreeField.Exporter.Core/       net8.0, NO Revit refs: manifest model, 2D affine math, bundle writer,
                                    PDF metadata/attachment embedding (PDFsharp, MIT)
-src/FreeField.Exporter.Revit/      Revit add-in. Primary: Revit 2027 / net10.0-windows. Keep csproj ready to add
-                                   2025/2026 (net8.0-windows) via a RevitVersion property; reference
+src/FreeField.Exporter.Revit/      Revit add-in. Primary: Revit 2025 / net8.0-windows (user directive). Switchable via a
+                                   RevitVersion property: 2026 → net8.0-windows, 2027 → net10.0-windows; reference
                                    RevitAPI/RevitAPIUI from "C:\Program Files\Autodesk\Revit <ver>" (Private=false)
 tests/FreeField.Exporter.Core.Tests/  xUnit
 tools/bundle-validator/            Node 20 + TS: schema validation + geometric validation against IFC via web-ifc
@@ -146,7 +146,9 @@ defaults, writes `resultFile` (status, timings, warnings, bundle path) and close
 
 ## 6. Acceptance (Definition of Done)
 1. `dotnet test` green for Core (affine math round-trips, reflection handling, manifest serialization matches schema).
-2. Snowdon Towers Sample Architectural (Revit 2027 sample) exports a bundle with ≥1 plan sheet per level that has plan views on sheets.
+2. **Primary test target (user directive 2026-11-20): Revit 2025 + `STRUCTURAL_CO.rvt`** (user-supplied, workspace root;
+   always work on a copy). Exports a bundle with every sheet that hosts plan viewports (FloorPlan / EngineeringPlan /
+   CeilingPlan / AreaPlan). Snowdon Towers (Revit 2027 sample) is a secondary/optional target.
 3. `tools/bundle-validator` passes: schema-valid; every file referenced exists; each PDF is single-page and size matches
    `page`; every viewport `storeyName` exists in its IFC; **geometric check**: for every plan viewport, ≥90% of
    indexed elements whose GlobalId exists in the IFC have their IFC placement/bbox centre (XY) inside their PDF bbox
