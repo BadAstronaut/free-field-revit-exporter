@@ -86,13 +86,13 @@ public sealed class BundleWriter : IDisposable
             idx.SheetId = s.Id;
             linkCount += idx.Links.Count;
 
-            var payload = new SheetEmbedPayload
+            var payload = new EmbeddedSheetPayload
             {
                 SheetId = s.Id, SheetNumber = s.Number, SheetName = s.Name, Page = s.Page,
-                Viewports = s.Viewports, Index = idx,
+                Viewports = s.Viewports, Elements = idx.Elements, Links = idx.Links,
             };
             foreach (var e in idx.Elements)
-                if (elements.TryGetValue(e.Gid, out var rec)) payload.Elements[e.Gid] = rec;
+                if (elements.TryGetValue(e.Gid, out var rec)) payload.ElementRecords[e.Gid] = rec;
 
             PdfTools.EmbedJson(tmpPdf, SheetAttachmentName, BundleJson.SerializeToUtf8(payload), new Dictionary<string, string>
             {
@@ -101,7 +101,7 @@ public sealed class BundleWriter : IDisposable
                 ["Keywords"] = "freefield;bundle;" + s.Number,
                 ["FreeFieldSheetId"] = s.Id,
                 ["FreeFieldSheetNumber"] = s.Number,
-                ["FreeFieldSchema"] = SheetEmbedPayload.SchemaId,
+                ["FreeFieldSchema"] = EmbeddedSheetPayload.SchemaId,
             });
             sheetFiles.Add((s.File, tmpPdf));
             sheetData.Add((s.Data, BundleJson.SerializeToUtf8(idx)));

@@ -1,4 +1,4 @@
-import { PDFDocument, PDFName, PDFDict, PDFArray, PDFHexString, PDFString, PDFRef, PDFStream, decodePDFRawStream, PDFRawStream } from 'pdf-lib';
+import { PDFDocument, PDFName } from 'pdf-lib';
 
 export interface PdfInfo {
   pageCount: number;
@@ -27,28 +27,25 @@ export async function readPdf(bytes: Uint8Array, attachmentName = 'freefield-she
     const rot = ((page.getRotation().angle % 360) + 360) % 360;
     if (rot === 90 || rot === 270) [w, h] = [h, w];
   }
-  const attachments: string[] = [];
-  let embeddedSheetJson: unknown;
-  try {
-    const names = doc.catalog.lookupMaybe(PDFName.of('Names'), PDFDict);
-    const ef = names?.lookupMaybe(PDFName.of('EmbeddedFiles'), PDFDict);
-    const arr = ef?.lookupMaybe(PDFName.of('Names'), PDFArray);
-    if (arr) {
-      for (let i = 0; i + 1 < arr.size(); i += 2) {
-        const key = arr.lookup(i);
-        const name = key instanceof PDFHexString || key instanceof PDFString ? key.decodeText() : String(key);
-        attachments.push(name);
-        if (name === attachmentName) {
-          const spec = arr.lookup(i + 1, PDFDict);
-          const stream = spec.lookup(PDFName.of('EF'), PDFDict).lookup(PDFName.of('F'));
-          if (stream instanceof PDFRawStream) {
-            const data = decodePDFRawStream(stream).decode();
-            embeddedSheetJson = JSON.parse(Buffer.from(data).toString('utf8'));
-          }
-        }
-      }
-    }
-  } catch { /* attachments are best effort */ }
-  void PDFRef; void PDFStream;
+  const { attachments, embeddedSheetJson } = await readAttachmentsWithPdfJs(bytes, attachmentName);
   return { pageCount, widthPt: w, heightPt: h, attachments, embeddedSheetJson };
+}
+
+/** Reads attachments the way the FreeField viewer does: pdf.js `getAttachments()`. */
+async function readAttachmentsWithPdfJs(bytes: Uint8Array, attachmentName: string): Promise<{ attachments: string[]; embeddedSheetJson?: unknown; error?: string }> {
+  try {
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const task = pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: false, isEvalSupported: false, verbosity: 0 });
+    const doc = await task.promise;
+    try {
+      const att = (await doc.getAttachments()) as Record<string, { filename: string; content: Uint8Array }> | null;
+      const attachments = Object.values(att ?? {}).map((a) => a.filename);
+      const hit = Object.values(att ?? {}).find((a) => a.filename === attachmentName);
+      let embeddedSheetJson: unknown;
+      if (hit) embeddedSheetJson = JSON.parse(Buffer.from(hit.content).toString('utf8'));
+      return { attachments, embeddedSheetJson };
+    } finally { await doc.destroy(); }
+  } catch (e) {
+    return { attachments: [], error: String(e) };
+  }
 }

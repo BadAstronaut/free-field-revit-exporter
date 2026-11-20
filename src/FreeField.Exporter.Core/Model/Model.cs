@@ -192,8 +192,11 @@ public sealed class DataRow
     [JsonPropertyName("cells")] public List<string> Cells { get; set; } = new();
 }
 
-/// <summary>Payload embedded in each sheet PDF as <c>freefield-sheet.json</c>.</summary>
-public sealed class SheetEmbedPayload
+/// <summary>
+/// Self-sufficient payload embedded in each sheet PDF as the attachment <c>freefield-sheet.json</c>.
+/// Consumers read BIM properties from this alone (no bundle data files needed).
+/// </summary>
+public sealed class EmbeddedSheetPayload
 {
     public const string SchemaId = "freefield.sheet/1";
     [JsonPropertyName("schema")] public string Schema { get; set; } = SchemaId;
@@ -201,8 +204,12 @@ public sealed class SheetEmbedPayload
     [JsonPropertyName("sheetNumber")] public string SheetNumber { get; set; } = "";
     [JsonPropertyName("sheetName")] public string SheetName { get; set; } = "";
     [JsonPropertyName("page")] public PageSize Page { get; set; } = new();
+    /// <summary>Viewports of this sheet (id, storeyName, pdfRegion, pdfToModel and the rest of the manifest entry).</summary>
     [JsonPropertyName("viewports")] public List<ViewportEntry> Viewports { get; set; } = new();
-    [JsonPropertyName("index")] public SheetElementIndex Index { get; set; } = new();
-    /// <summary>Element records referenced by <see cref="Index"/>, keyed by gid.</summary>
-    [JsonPropertyName("elements")] public Dictionary<string, ElementRecord> Elements { get; set; } = new();
+    /// <summary>The SheetElementIndex entries (gid, vp, bbox, outline).</summary>
+    [JsonPropertyName("elements")] public List<SheetElement> Elements { get; set; } = new();
+    /// <summary>ElementRecords referenced by <see cref="Elements"/>, keyed by gid.</summary>
+    [JsonPropertyName("elementRecords")] public Dictionary<string, ElementRecord> ElementRecords { get; set; } = new();
+    /// <summary>Links, with targetSheetId and targetSheetNumber.</summary>
+    [JsonPropertyName("links")] public List<SheetLink> Links { get; set; } = new();
 }

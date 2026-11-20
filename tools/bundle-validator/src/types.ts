@@ -1,6 +1,6 @@
 // Local copy of the relevant bundle types (see schema/ffbundle.d.ts, which is the shared contract).
 export type {
-  BundleManifest, SheetEntry, ViewportEntry, ModelEntry, ElementsFile, SheetElementIndex, DataTable,
+  BundleManifest, EmbeddedSheetPayload, SheetEntry, ViewportEntry, ModelEntry, ElementsFile, SheetElementIndex, DataTable,
 } from '../../../schema/ffbundle.js';
 
 export type Status = 'PASS' | 'FAIL' | 'WARN' | 'SKIP';

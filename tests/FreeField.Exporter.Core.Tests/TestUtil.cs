@@ -81,7 +81,7 @@ internal static class TestUtil
             {
                 SheetId = "sheet-1",
                 Elements = { new SheetElement { Gid = "gid1", Vp = "vp1", Bbox = new double[] { 120, 130, 140, 150 }, Outline = new[] { new[] { 120.0, 130.0 }, new[] { 140.0, 150.0 } } } },
-                Links = { new SheetLink { Kind = "section", Bbox = new double[] { 1, 2, 3, 4 }, TargetSheetNumber = "A201" } },
+                Links = { new SheetLink { Kind = "section", Bbox = new double[] { 1, 2, 3, 4 }, TargetSheetId = "sheet-2-target", TargetSheetNumber = "A201" } },
             },
         };
         return m;

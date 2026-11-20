@@ -141,9 +141,16 @@ public class BundleRoundTripTests
         var emb = JsonNode.Parse(PdfTools.ReadEmbeddedJson(pdfOut, BundleWriter.SheetAttachmentName)!)!;
         Assert.Equal("freefield.sheet/1", (string?)emb["schema"]);
         Assert.Equal("sheet-1", (string?)emb["sheetId"]);
-        Assert.Equal("gid1", (string?)emb["index"]!["elements"]![0]!["gid"]);
-        Assert.NotNull(emb["elements"]!["gid1"]);
-        Assert.Null(emb["elements"]!["gid2"]); // only referenced records
+        Assert.Equal("A/103 x", (string?)emb["sheetNumber"]);
+        Assert.Equal("Third Floor Plan", (string?)emb["sheetName"]);
+        Assert.Equal("gid1", (string?)emb["elements"]![0]!["gid"]);
+        Assert.NotNull(emb["elementRecords"]!["gid1"]);
+        Assert.Null(emb["elementRecords"]!["gid2"]); // only referenced records
+        Assert.Equal("Level 3", (string?)emb["viewports"]![0]!["storeyName"]);
+        Assert.Equal(6, emb["viewports"]![0]!["pdfToModel"]!.AsArray().Count);
+        Assert.Equal("sheet-2-target", (string?)emb["links"]![0]!["targetSheetId"]);
+        Assert.Equal("A201", (string?)emb["links"]![0]!["targetSheetNumber"]);
+        Assert.True(JsonTests.Validate("EmbeddedSheetPayload", emb.ToJsonString()).IsValid);
     }
 
     [Fact]

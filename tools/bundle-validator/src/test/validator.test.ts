@@ -6,6 +6,8 @@ import path from 'node:path';
 import { makeFixture } from '../fixture/make-fixture.js';
 import { validateBundle } from '../validate.js';
 import { toMarkdown } from '../report.js';
+import { Zip } from '../zip.js';
+import { IfcModel } from '../ifc.js';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ffvalidator-test-'));
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
@@ -50,4 +52,38 @@ test('PDF page size mismatch fails', async () => {
   const r = await validateBundle(await makeFixture({ outPath: path.join(dir, 'bad-page.ffbundle'), wrongPageSize: true }));
   assert.equal(r.ok, false);
   assert.ok(failing(r).includes('pdf A101'));
+});
+
+test('PDF without embedded freefield-sheet.json fails', async () => {
+  const r = await validateBundle(await makeFixture({ outPath: path.join(dir, 'no-att.ffbundle'), noAttachment: true }));
+  assert.equal(r.ok, false);
+  assert.ok(failing(r).includes('pdf A101 embedded json (pdf.js)'));
+});
+
+test('embedded payload is readable through pdf.js and self-sufficient', async () => {
+  const r = await validateBundle(await makeFixture({ outPath: path.join(dir, 'att.ffbundle') }));
+  const c = r.checks.find((x) => x.name === 'pdf A101 embedded json (pdf.js)');
+  assert.equal(c?.status, 'PASS', c?.detail);
+});
+
+// Axis-convention guard: web-ifc emits Y-up (X, Z, -Y). Fixture walls have heights (z) far from their y, so using
+// z (or +z) instead of -z for model Y would put every centre >20 m off. Expected values are the authored IFC XY.
+test('IfcModel.xyCentres returns IFC Z-up XY (modelX = vx, modelY = -vz)', async () => {
+  const bundle = await makeFixture({ outPath: path.join(dir, 'axis.ffbundle') });
+  const zip = await Zip.open(bundle);
+  const ifcPath = path.join(dir, 'axis.ifc');
+  await zip.extract('models/arch.ifc', ifcPath); zip.close();
+  const ifc = await IfcModel.open(ifcPath);
+  try {
+    const g = ifc.globalIds();
+    const c = ifc.xyCentres([...g.values()]);
+    const expect: Record<string, [number, number]> = {
+      '3fixtureWallA00000000A': [15, 23.1], '3fixtureWallB00000000B': [18.1, 25.5],
+      '3fixtureSlabS00000000S': [17, 27], '3fixtureWallC00000000C': [21.9, 25],
+    };
+    for (const [gid, [x, y]] of Object.entries(expect)) {
+      const got = c.get(g.get(gid)!)!;
+      assert.ok(Math.abs(got[0] - x) < 1e-3 && Math.abs(got[1] - y) < 1e-3, `${gid}: ${got} vs ${x},${y}`);
+    }
+  } finally { ifc.close(); }
 });

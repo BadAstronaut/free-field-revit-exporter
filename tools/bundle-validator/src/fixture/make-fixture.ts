@@ -17,6 +17,8 @@ export interface FixtureOptions {
   wrongStorey?: boolean;
   /** Declare a wrong page size in the manifest. */
   wrongPageSize?: boolean;
+  /** Do not embed freefield-sheet.json in the PDF. */
+  noAttachment?: boolean;
 }
 
 const BUILDING_OFFSET = [10, 20]; // metres; verifies placement chaining
@@ -111,8 +113,18 @@ export async function makeFixture(opts: FixtureOptions): Promise<string> {
   const elements: Record<string, unknown> = {};
   for (const e of [...ELS.map((x) => ({ gid: x.gid, name: x.name })), { gid: FAKE_GID, name: 'ghost' }])
     elements[e.gid] = { uid: 'uid-' + e.gid, eid: 1, gid: e.gid, category: 'Walls', bic: 'OST_Walls', family: '', type: e.name, level: 'Level 1', modelId: 'arch', params: { Mark: { v: e.name, d: e.name, t: false, k: 'ALL_MODEL_MARK' } } };
-  const index = { sheetId, elements: elemsIdx, links: [] };
-  doc.attach(Buffer.from(JSON.stringify({ schema: 'freefield.sheet/1', sheetId, index, elements })), 'freefield-sheet.json', { mimeType: 'application/json', description: 'fixture' });
+  const links = [{ kind: 'section', bbox: [10, 10, 30, 30], targetSheetId: 'sheet-uid-2', targetSheetNumber: 'A201', targetViewId: 'view-9' }];
+  const index = { sheetId, elements: elemsIdx, links };
+  const vpEntry = {
+    id: vpId, viewId: 'view-1', viewName: 'Level 1', viewType: 'FloorPlan', scale: SCALE, modelId: 'arch',
+    storeyName: opts.wrongStorey ? 'Level 99' : 'Level 1', primary: true, pdfRegion: region, pdfToModel: aff,
+    controlPoints: [cp(region[0], region[1]), cp(region[2], region[3])],
+  };
+  const payload = {
+    schema: 'freefield.sheet/1', sheetId, sheetNumber: 'A101', sheetName: 'First Floor Plan', page: { widthPt: PAGE.w, heightPt: PAGE.h },
+    viewports: [vpEntry], elements: elemsIdx, elementRecords: elements, links,
+  };
+  if (!opts.noAttachment) doc.attach(Buffer.from(JSON.stringify(payload)), 'freefield-sheet.json', { mimeType: 'application/json', description: 'fixture' });
   const pdfBytes = await doc.save();
 
   const manifest = {
@@ -126,15 +138,11 @@ export async function makeFixture(opts: FixtureOptions): Promise<string> {
     sheets: [{
       id: sheetId, number: 'A101', name: 'First Floor Plan', file: 'sheets/A101.pdf', data: 'data/sheets/A101.json',
       page: opts.wrongPageSize ? { widthPt: 1200, heightPt: 800 } : { widthPt: PAGE.w, heightPt: PAGE.h },
-      viewports: [{
-        id: vpId, viewId: 'view-1', viewName: 'Level 1', viewType: 'FloorPlan', scale: SCALE, modelId: 'arch',
-        storeyName: opts.wrongStorey ? 'Level 99' : 'Level 1', primary: true, pdfRegion: region, pdfToModel: aff,
-        controlPoints: [cp(region[0], region[1]), cp(region[2], region[3])],
-      }],
+      viewports: [vpEntry],
     }],
     schedules: [],
     elementsFile: 'data/elements.json',
-    stats: { elements: Object.keys(elements).length, sheets: 1, viewports: 1, links: 0 },
+    stats: { elements: Object.keys(elements).length, sheets: 1, viewports: 1, links: 1 },
   };
 
   fs.mkdirSync(path.dirname(path.resolve(opts.outPath)), { recursive: true });

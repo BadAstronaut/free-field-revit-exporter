@@ -8,7 +8,7 @@ import { Zip } from './zip.js';
 import { readPdf } from './pdf.js';
 import { IfcModel } from './ifc.js';
 import type {
-  BundleManifest, ElementsFile, SheetElementIndex, DataTable, CheckResult, ViewportReport, ValidationReport, Status,
+  BundleManifest, EmbeddedSheetPayload, ElementsFile, SheetElementIndex, DataTable, CheckResult, ViewportReport, ValidationReport, Status,
 } from './types.js';
 
 export interface Options {
@@ -149,7 +149,27 @@ export async function validateBundle(bundlePath: string, opts: Partial<Options> 
         if (Math.abs(info.widthPt - s.page.widthPt) > 0.5 || Math.abs(info.heightPt - s.page.heightPt) > 0.5)
           problems.push(`size ${info.widthPt.toFixed(2)}x${info.heightPt.toFixed(2)} != manifest ${s.page.widthPt}x${s.page.heightPt}`);
         add(name, problems.length ? 'FAIL' : 'PASS', problems.join('; ') || `1 page ${info.widthPt.toFixed(1)}x${info.heightPt.toFixed(1)} pt`);
-        if (!info.attachments.includes('freefield-sheet.json')) add(`${name} embedded json`, 'WARN', 'freefield-sheet.json attachment not found');
+        const ename = `${name} embedded json (pdf.js)`;
+        if (!info.attachments.includes('freefield-sheet.json')) add(ename, 'FAIL', 'freefield-sheet.json not readable via pdf.js getAttachments()');
+        else {
+          const emb = info.embeddedSheetJson as EmbeddedSheetPayload;
+          const vE = vDef('EmbeddedSheetPayload');
+          const errs: string[] = [];
+          if (!vE(emb)) errs.push(fmt(vE.errors));
+          else {
+            if (emb.sheetId !== s.id) errs.push('sheetId mismatch');
+            if (emb.sheetNumber !== s.number) errs.push('sheetNumber mismatch');
+            const noRec = emb.elements.filter((x) => !emb.elementRecords[x.gid] && elements[x.gid]);
+            if (noRec.length) errs.push(`${noRec.length} indexed elements lack elementRecords`);
+            const badLinks = emb.links.filter((l) => l.targetSheetId && !l.targetSheetNumber || l.targetSheetNumber && !l.targetSheetId);
+            if (badLinks.length) errs.push(`${badLinks.length} links lack targetSheetId or targetSheetNumber`);
+            const idx = sheetIndex.get(s.id);
+            if (idx && idx.elements.length !== emb.elements.length) errs.push('elements differ from data/sheets index');
+            const ids = new Set(emb.viewports.map((x) => x.id));
+            if (s.viewports.some((x) => !ids.has(x.id))) errs.push('viewports missing');
+          }
+          add(ename, errs.length ? 'FAIL' : 'PASS', errs.join('; ') || `${emb.elements.length} elements, ${Object.keys(emb.elementRecords).length} records, ${emb.links.length} links`);
+        }
       } catch (e) { add(name, 'FAIL', `unreadable PDF: ${e}`); }
     }
 

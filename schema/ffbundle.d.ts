@@ -145,14 +145,15 @@ export interface DataRow {
   cells: string[];
 }
 
-// Attached to each sheet PDF as the embedded file `freefield-sheet.json`
-export interface SheetEmbedPayload {
+// Attached to each sheet PDF as the embedded file `freefield-sheet.json` (self-sufficient)
+export interface EmbeddedSheetPayload {
   schema: 'freefield.sheet/1';
   sheetId: string;
-  sheetNumber?: string;
-  sheetName?: string;
+  sheetNumber: string;
+  sheetName: string;
   page?: { widthPt: number; heightPt: number };
-  viewports?: ViewportEntry[];
-  index: SheetElementIndex;
-  elements: ElementsFile; // records referenced by `index`
+  viewports: ViewportEntry[]; // id, storeyName, pdfRegion, pdfToModel, ...
+  elements: SheetElement[]; // the SheetElementIndex entries
+  elementRecords: ElementsFile; // records referenced by `elements`, keyed by gid
+  links: SheetLink[]; // with targetSheetId and targetSheetNumber
 }

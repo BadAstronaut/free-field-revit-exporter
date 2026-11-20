@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.freefield.app/ffbundle/1/ffbundle.schema.json",
   "title": "FreeField bundle manifest (freefield.bundle/1)",
-  "description": "Root schema validates manifest.json. Other bundle files are described by $defs: ElementsFile (data/elements.json), SheetElementIndex (data/sheets/<n>.json), DataTable (data/schedules/<slug>.json), SheetEmbedPayload (freefield-sheet.json attached to each sheet PDF).",
+  "description": "Root schema validates manifest.json. Other bundle files are described by $defs: ElementsFile (data/elements.json), SheetElementIndex (data/sheets/<n>.json), DataTable (data/schedules/<slug>.json), EmbeddedSheetPayload (freefield-sheet.json attached to each sheet PDF).",
   "type": "object",
   "required": ["schema", "generator", "exportedAt", "project", "units", "coordinates", "models", "sheets", "schedules", "elementsFile", "stats"],
   "properties": {
@@ -250,10 +250,10 @@
         "rows": { "type": "array", "items": { "$ref": "#/$defs/DataRow" } }
       }
     },
-    "SheetEmbedPayload": {
+    "EmbeddedSheetPayload": {
       "type": "object",
-      "description": "freefield-sheet.json attached to each sheet PDF.",
-      "required": ["schema", "sheetId", "index", "elements"],
+      "description": "freefield-sheet.json attached to each sheet PDF. Self-sufficient: consumers need nothing else to show element properties.",
+      "required": ["schema", "sheetId", "sheetNumber", "sheetName", "viewports", "elements", "elementRecords", "links"],
       "properties": {
         "schema": { "const": "freefield.sheet/1" },
         "sheetId": { "type": "string" },
@@ -261,8 +261,12 @@
         "sheetName": { "type": "string" },
         "page": { "type": "object" },
         "viewports": { "type": "array", "items": { "$ref": "#/$defs/ViewportEntry" } },
-        "index": { "$ref": "#/$defs/SheetElementIndex" },
-        "elements": { "$ref": "#/$defs/ElementsFile" }
+        "elements": { "type": "array", "items": { "$ref": "#/$defs/SheetElement" } },
+        "elementRecords": { "$ref": "#/$defs/ElementsFile" },
+        "links": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SheetLink" }
+        }
       }
     }
   }

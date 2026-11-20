@@ -14,7 +14,7 @@ public class JsonTests
 
     private static EvaluationResults Eval(JsonSchema s, JsonNode? n) => s.Evaluate(JsonSerializer.SerializeToElement(n), EvalOpts);
 
-    private static EvaluationResults Validate(string def, string json)
+    internal static EvaluationResults Validate(string def, string json)
     {
         var wrapper = JsonSchema.FromText($"{{\"$ref\":\"{SchemaUri}#/$defs/{def}\"}}", Build);
         return Eval(wrapper, JsonNode.Parse(json));
