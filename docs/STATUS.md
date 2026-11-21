@@ -11,6 +11,8 @@
 | FreeField importer (`free-field` branch `architect/ffbundle-import`, worktree `../free-field-bundle`) | Done, not pushed | real bundle: 6 calibrations, 410/410 elements within 0.5 m in FreeField world (median < 1 mm), idempotent re-import; browser walkthrough in Edge passed |
 | FreeField drawing data (tap → properties with outline highlight, sheet links + Back, elements table, CSV/XLSX, schedule tabs) | Done | component tests + browser on v2 bundle: 120-row schedule tab, XLSX 121 rows |
 | Rotated calibrations in LinkView | Done | UV-registered overlay tests at 0/25/90/−45/180°; top-down browser check at 25° |
+| Code review of importer branch | Done, all 7 important findings fixed | `docs/reports/review-ffbundle-import.md`; fixes c88aea5, 61b5fc4, 1b5c524 with failing-first tests; branch now 13 commits; settings 401, documents 78, linkview 101, ff-viewer-react 516, ff-viewer-tools 194, @ff/data 72 |
+| FreeField production build | App bundle builds (vite, 2713 modules) | full `pnpm build` fails on `main` too: test mock in ff-viewer-tools lacks `setMemoryPressure` (from main commit e64d8da) |
 
 ## Blockers needing the user
 1. **Unsigned add-in prompt** on every Revit start (still unsigned as of v2 run; the user clicked through manually): run `tools/signing/sign-addins.ps1 -Setup` once (Revit closed, click Yes on the certificate dialog). `install-addin.ps1` signs automatically afterwards. Undo: `-Remove`.
@@ -30,6 +32,7 @@ FreeField: `pnpm --filter settings dev` in `../free-field-bundle` (demo auth), t
 Opt-in data e2e: `FF_E2E_BUNDLE=<bundle> NODE_OPTIONS="--import tsx" pnpm exec vitest run __tests__/bundle/e2e.realBundle.test.ts` (in `apps/settings`).
 
 ## Known limitations / next
+- Exporter indexes elements the view counts as visible but doesn't draw (e.g. footings on VIEW-CO-101, see `docs/reports/outlines-view-co-101.md`); add a per-element drawn-in-view check (needs Revit).
 - Schedule rows bind to elements by matching displayed values (no Revit API maps rows to elements); elements with identical displayed values are interchangeable.
 - Schedules not placed on any sheet are in the bundle (`data/schedules`) but FreeField doesn't import them yet (needs a store; follow-up).
 - Fixture framing schedule is placed over the plan on FF-101 (cosmetic, fixture only).
