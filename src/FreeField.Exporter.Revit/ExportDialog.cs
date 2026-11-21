@@ -171,7 +171,7 @@ public sealed class ExportDialog : Window
         clr.Click += (_, _) => { _model.Clear(); SyncRowsFromModel(); UpdateSummary(); };
         top.Children.Add(all); top.Children.Add(clr); top.Children.Add(_summary);
         AutomationProperties.SetName(_search, "Search"); AutomationProperties.SetName(_levelFilter, "Level filter");
-        AutomationProperties.SetName(all, "Select all mappable"); AutomationProperties.SetName(clr, "Clear"); AutomationProperties.SetName(_summary, "Summary");
+        AutomationProperties.SetName(all, "Select all mappable"); AutomationProperties.SetName(clr, "Clear");   // the summary / status / result TextBlocks keep their text as UIA Name so scripts can read them
         AutomationProperties.SetName(_go, "Export"); AutomationProperties.SetName(_cancel, "Cancel"); AutomationProperties.SetName(_close, "Close");
         AutomationProperties.SetName(_out, "Output folder"); AutomationProperties.SetName(_ifc, "IFC version");
         DockPanel.SetDock(top, Dock.Top); root.Children.Add(top);
@@ -196,7 +196,9 @@ public sealed class ExportDialog : Window
         levelGrid.Columns.Add(new DataGridTextColumn { Header = "Elevation (m)", Binding = new Binding(nameof(LevelVm.Elevation)), Width = 100 });
         levelGrid.Columns.Add(new DataGridTextColumn { Header = "Floor plan on a selected sheet", Binding = new Binding(nameof(LevelVm.Plan)), Width = 200 });
         AutomationProperties.SetName(levelGrid, "Levels");
-        mid.Children.Add(new Expander { Header = "Levels (Revit level → IFC storey, read-only)", IsExpanded = false, Content = levelGrid, Margin = new Thickness(0, 6, 0, 0) });
+        var levelsExp = new Expander { Header = "Levels (Revit level → IFC storey, read-only)", IsExpanded = false, Content = levelGrid, Margin = new Thickness(0, 6, 0, 0) };
+        AutomationProperties.SetName(levelsExp, "Levels panel");
+        mid.Children.Add(levelsExp);
 
         var opts = new StackPanel { Margin = new Thickness(0, 4, 0, 0) };
         var r1 = new StackPanel { Orientation = Orientation.Horizontal };

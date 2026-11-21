@@ -14,6 +14,8 @@
 | Code review of importer branch | Done, all 7 important findings fixed | `docs/reports/review-ffbundle-import.md`; fixes c88aea5, 61b5fc4, 1b5c524 with failing-first tests; branch now 13 commits; settings 401, documents 78, linkview 101, ff-viewer-react 516, ff-viewer-tools 194, @ff/data 72 |
 | FreeField production build | App bundle builds (vite, 2713 modules) | full `pnpm build` fails on `main` too: test mock in ff-viewer-tools lacks `setMemoryPressure` (from main commit e64d8da) |
 
+| Snowdon Towers launch test (Revit 2025, 55 sheets) | Done, validator PASS | `docs/reports/launch-snowdon.md`: default selection = 28 floor-plan sheets + 2 views, 39.6 MB, 215 s (cached IFC); dialog driven through UI Automation; Door Schedule 132/132 rows bound |
+
 ## Blockers needing the user
 1. **Unsigned add-in prompt** on every Revit start (still unsigned as of v2 run; the user clicked through manually): run `tools/signing/sign-addins.ps1 -Setup` once (Revit closed, click Yes on the certificate dialog). `install-addin.ps1` signs automatically afterwards. Undo: `-Remove`.
 2. **Remotes**: this repo has no GitHub remote (`gh` not installed). The `free-field` branch is unpushed pending approval.
@@ -32,7 +34,7 @@ FreeField: `pnpm --filter settings dev` in `../free-field-bundle` (demo auth), t
 Opt-in data e2e: `FF_E2E_BUNDLE=<bundle> NODE_OPTIONS="--import tsx" pnpm exec vitest run __tests__/bundle/e2e.realBundle.test.ts` (in `apps/settings`).
 
 ## Known limitations / next
-- Exporter indexes elements the view counts as visible but doesn't draw (e.g. footings on VIEW-CO-101, see `docs/reports/outlines-view-co-101.md`); add a per-element drawn-in-view check (needs Revit).
+- Drawn-in-view check is implemented (view range + empty view geometry + hidden/filters); see `docs/reports/launch-snowdon.md`.
 - Schedule rows bind to elements by matching displayed values (no Revit API maps rows to elements); elements with identical displayed values are interchangeable.
 - Schedules not placed on any sheet are in the bundle (`data/schedules`) but FreeField doesn't import them yet (needs a store; follow-up).
 - Fixture framing schedule is placed over the plan on FF-101 (cosmetic, fixture only).

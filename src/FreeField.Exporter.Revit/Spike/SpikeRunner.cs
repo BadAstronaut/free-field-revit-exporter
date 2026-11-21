@@ -51,6 +51,10 @@ public static class SpikeRunner
                         new ExportDialog(doc).ShowDialog();
                         break;
                     }
+                    case "schedplace":
+                        Save(outDir, "spike-schedplace.json", new FilteredElementCollector(doc).OfClass(typeof(ScheduleSheetInstance)).Cast<ScheduleSheetInstance>()
+                            .Where(i => !i.IsTitleblockRevisionSchedule).Select(i => new { schedule = doc.GetElement(i.ScheduleId)?.Name, sheet = (doc.GetElement(i.OwnerViewId) as ViewSheet)?.SheetNumber }).ToList());
+                        break;
                     case "views": Save(outDir, "spike-views.json", Views(doc)); break;
                     case "mksheets": Save(outDir, "spike-mksheets.json", MakeSheets(doc, job, outDir)); break;
                     case "pdf": Save(outDir, "spike-pdf-" + job.Opt("sheet", "x") + ".json", Pdf(doc, job, outDir)); break;
