@@ -103,6 +103,9 @@ public static class ExportPipeline
                 foreach (var row in model0.Views)
                     if (wantViewIds.Contains(row.ViewId) && (opt.PlanViewNames == null || opt.PlanViewNames.Contains(row.ViewName)) && survey.ViewById.TryGetValue(row.ViewId, out var pv)) planViews.Add(pv);
             progress(3, "Selected " + pages.Count + " sheets and " + planViews.Count + " plan views");
+            if (pages.Count == 0 && planViews.Count == 0)
+                throw new InvalidOperationException("Nothing to export: no sheet or floor-plan view in the selection maps to an IFC storey. " +
+                    "Place floor plans on sheets, or tick sheets/views explicitly (option includeUnmappedSheets exports sheets without a floor plan).");
             Stage("collect");
 
             // 2. IFC
@@ -142,6 +145,9 @@ public static class ExportPipeline
                 }
                 pages = keep;
             }
+
+            if (pages.Count == 0 && planViews.Count == 0)
+                throw new InvalidOperationException("Nothing to export: after the IFC export none of the selected sheets/views has a floor-plan level that is an IfcBuildingStorey.");
 
             // 3. temp sheets for unplaced plan views (rolled back at the end)
             TransactionGroup? tg = null;

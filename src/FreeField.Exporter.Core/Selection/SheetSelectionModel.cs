@@ -86,6 +86,14 @@ public sealed class LevelRow
     public string? NotExportedReason { get; init; }
 }
 
+/// <summary>Bundle size model, a least-squares fit through two real Snowdon Towers exports (98 MB rvt): 66 pages = 61.4 MB, 30 pages = 39.6 MB.</summary>
+public static class SizeModel
+{
+    public const double MbPerPage = 0.6;
+    public const double MbPerRvtMb = 0.218;
+    public static double Estimate(int pages, double rvtMb) => Math.Round(pages * MbPerPage + rvtMb * MbPerRvtMb, 1);
+}
+
 public sealed record SelectionSummary(int Sheets, int Levels, int Views, int MappedLevels, double EstimatedMb);
 
 /// <summary>
@@ -210,12 +218,12 @@ public sealed class SheetSelectionModel
         return true;
     }
 
-    /// <summary>Rough bundle size: ~0.65 MB per exported page (vector PDFs, calibrated on Snowdon Towers: 66 pages + 98 MB rvt = 61.5 MB bundle) plus the zipped IFC (about <paramref name="ifcMbPerRvtMb"/> x the rvt size).</summary>
-    public SelectionSummary Summary(double rvtMb = 0, double ifcMbPerRvtMb = 0.16)
+    /// <summary>Rough bundle size (see <see cref="SizeModel"/>): pages x MbPerPage + the zipped IFC (about <paramref name="ifcMbPerRvtMb"/> x the rvt size).</summary>
+    public SelectionSummary Summary(double rvtMb = 0, double ifcMbPerRvtMb = SizeModel.MbPerRvtMb)
     {
         var pages = Sheets.Count(s => s.Selected) + Views.Count(v => v.Selected);
         var mappedLevels = Levels.Count(l => l.HasPlanOnSelection && l.StoreyName != null);
-        return new SelectionSummary(Sheets.Count(s => s.Selected), mappedLevels, Views.Count(v => v.Selected), mappedLevels, Math.Round(pages * 0.65 + rvtMb * ifcMbPerRvtMb, 1));
+        return new SelectionSummary(Sheets.Count(s => s.Selected), mappedLevels, Views.Count(v => v.Selected), mappedLevels, Math.Round(pages * SizeModel.MbPerPage + rvtMb * ifcMbPerRvtMb, 1));
     }
 
     public string SummaryLine(double rvtMb = 0)

@@ -128,6 +128,15 @@ public class SheetSelectionModelTests
     }
 
     [Theory]
+    [InlineData(30, 97.8, 39.6)]    // Snowdon default export (28 sheets + 2 views)
+    [InlineData(66, 97.8, 61.4)]    // Snowdon, all unplaced views checked
+    public void SizeEstimate_WithinTenPercentOfRealSnowdonBundles(int pages, double rvtMb, double actualMb)
+    {
+        var est = SizeModel.Estimate(pages, rvtMb);
+        Assert.InRange(est, actualMb * 0.9, actualMb * 1.1);
+    }
+
+    [Theory]
     [InlineData("", null, true)]
     [InlineData("first", null, true)]
     [InlineData("a101", null, true)]

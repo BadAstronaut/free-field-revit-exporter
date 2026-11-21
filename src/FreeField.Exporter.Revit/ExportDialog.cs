@@ -339,8 +339,7 @@ public sealed class ExportDialog : Window
                 Dispatcher.Invoke(DispatcherPriority.Background, new Action(() => { }));   // keep Cancel / window responsive
             });
             _lastBundle = r.BundlePath;
-            _status.Text = $"Done: {r.Sheets} sheets, {r.Viewports} viewports, {r.Elements} elements, {r.Links} links, {r.Schedules} schedules" +
-                           (r.Warnings.Count > 0 ? $" ({r.Warnings.Count} warnings, see log)" : "") + "\n" + r.BundlePath;
+            _status.Text = "Done";   // details are shown once, in the result panel below
             _resultText.Text = $"{r.Sheets} pages ({r.PlanViewPages} from views), {r.Viewports} viewports, {r.Elements} elements, {r.Links} links, {r.Schedules} schedules, {r.Warnings.Count} warnings.\n{r.BundlePath}";
             _result.Visibility = System.Windows.Visibility.Visible;
             if (openFolder) { try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{r.BundlePath}\""); } catch { } }
