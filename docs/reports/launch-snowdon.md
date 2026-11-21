@@ -65,3 +65,25 @@ Screenshots (`C:\Users\rzlaz\AppData\Local\FreeFieldExporter\out\ui-20261121-064
 * The ribbon button was not clicked physically (see UI); the add-in is still unsigned (Revit prompts on every new build).
 * Edge-cover check is a heuristic (symbolic plan graphics differ from 3D footprints); the validator geometric check is the authority for coordinates.
 * The dialog remembers the last selection per document in `%LOCALAPPDATA%/FreeFieldExporter/prefs.json`; a stale remembered selection overrides new defaults (delete the file to reset).
+
+## Final launch run (clean install, installed add-in, real ribbon)
+Setup: `install-addin.ps1 -RevitVersion 2025` (Revit closed) registered `FreeField.Exporter.addin` -> `src\FreeField.Exporter.Revit\bin\x64\Debug\FreeField.Exporter.Revit.dll` (built 07:49, current commit; still unsigned; the dev hot-reload channel was disabled for the runs). Fresh copies `STRUCTURAL_CO_launch.rvt` (from the user's model) and `Snowdon_launch.rvt` (sample) in the work folder; originals untouched. Output: `C:\Users\rzlaz\AppData\Local\FreeFieldExporter\out\launch-20261121-074941`.
+The FreeField ribbon button was clicked through UI Automation (tab located with UIA, real mouse click on the button; the `Export Bundle` ribbon item exposes no Invoke pattern), i.e. the real ribbon command opened the dialog, the default selection was left alone and Export was pressed (`tools/scripts/ui-launch.ps1`).
+
+| | STRUCTURAL_CO (user model) | Snowdon Towers |
+|---|---|---|
+| Bundle | `C:\Users\rzlaz\AppData\Local\FreeFieldExporter\out\launch-20261121-074941\structural\bundle\STRUCTURAL_CO_launch.ffbundle` (0.5 MB) | `C:\Users\rzlaz\AppData\Local\FreeFieldExporter\out\launch-20261121-074941\snowdon\bundle\Snowdon_launch.ffbundle` (39.7 MB) |
+| Dialog summary (default) | 0 sheets · 5 levels · 6 extra views · est. 5.1 MB | 28 sheets · 13 levels · 2 extra views · est. 38.3 MB (actual 39.7: -3.5 %) |
+| Pages | 6, all `VIEW-*` (101 FIRST FLOOR, 201 SECOND FLOOR, 301 THIRD FLOOR, 401 FOURTH FLOOR, CO-101 FIRST FLOOR, T.O. FOOTING) | 30 = 28 sheets + 2 views |
+| Excluded by default | sheet S-101 (section + 3D only, no floor plan) | 27 sheets (same list as above) |
+| Viewports / elements / links / schedules | 6 / 203 / 6 / 0 | 51 / 5859 / 968 / 40 |
+| Warnings | 0 | 7 (legend viewports without transforms) |
+| Export time (cold IFC, through the dialog) | 14 s | 302 s |
+| Validator | PASS, 42 checks, 0 FAIL | PASS, 201 PASS, 1 WARN (A106 legend viewport has no elements), 0 FAIL (16 s) |
+Reports: `docs/reports/launch-structural-validator.md`, `docs/reports/launch-final-snowdon-validator.md`.
+
+Notes:
+* STRUCTURAL_CO has one native sheet (S-101: section + 3D), so by the floor-plan-only rule it is excluded and every plan view is exported as a `VIEW-*` page because no sheet covers those levels; `101 FIRST FLOOR` and `CO-101 FIRST FLOOR` both map to storey `101 FIRST FLOOR`.
+* The result panel now shows the counts once (status line says "Done"). The size estimate is a fit through two Snowdon exports (0.6 MB/page + 0.218 x rvt size, unit-tested within 10 % of both); it over-estimates tiny models (5.1 vs 0.5 MB).
+* Empty default selection: the dialog disables Export when nothing is checked and the pipeline now throws "Nothing to export: ..." (before the IFC export, and again after it if no level survives) instead of writing an empty bundle. Covered by code review only, not exercised live.
+* Closing Revit: the `PostCommand(ExitRevit)` used by the headless `exitWhenDone` did not close Revit in this build; the close was requested through the window's WindowPattern.Close (same as the X button). Save prompts are answered "No" by the automation dialog guard; no document was saved.

@@ -16,6 +16,8 @@
 
 | Snowdon Towers launch test (Revit 2025, 55 sheets) | Done, validator PASS | `docs/reports/launch-snowdon.md`: default selection = 28 floor-plan sheets + 2 views, 39.6 MB, 215 s (cached IFC); dialog driven through UI Automation; Door Schedule 132/132 rows bound |
 
+| Final launch run (installed add-in, real ribbon, STRUCTURAL_CO + Snowdon) | Done, validators PASS | `docs/reports/launch-snowdon.md` (Final launch run): STRUCTURAL_CO 6 VIEW pages / 0.5 MB / 14 s, Snowdon 30 pages / 39.7 MB / 302 s cold |
+
 ## Blockers needing the user
 1. **Unsigned add-in prompt** on every Revit start (still unsigned as of v2 run; the user clicked through manually): run `tools/signing/sign-addins.ps1 -Setup` once (Revit closed, click Yes on the certificate dialog). `install-addin.ps1` signs automatically afterwards. Undo: `-Remove`.
 2. **Remotes**: this repo has no GitHub remote (`gh` not installed). The `free-field` branch is unpushed pending approval.

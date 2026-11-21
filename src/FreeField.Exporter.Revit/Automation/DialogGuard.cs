@@ -26,6 +26,13 @@ public sealed class DialogGuard : IDisposable
         Log.Write("dialog: " + desc);
         try
         {
+            if (e is TaskDialogShowingEventArgs sv && (sv.DialogId.IndexOf("Save", StringComparison.OrdinalIgnoreCase) >= 0 || sv.Message.IndexOf("save", StringComparison.OrdinalIgnoreCase) >= 0 && sv.DialogId.IndexOf("Close", StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                // "Save changes?" while closing/exiting: never save the user's documents from automation.
+                if (!sv.OverrideResult((int)TaskDialogResult.No)) sv.OverrideResult((int)TaskDialogResult.Close);
+                Log.Write("save prompt answered No");
+                return;
+            }
             if (e is TaskDialogShowingEventArgs td)
             {
                 // Prefer a non-destructive answer; for upgrade / open prompts "OK/Yes/Close" is what we want.
