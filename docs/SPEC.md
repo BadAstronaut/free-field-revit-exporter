@@ -133,7 +133,7 @@ string length 2k.
 
 ## 5. Revit add-in behaviour
 Ribbon tab "FreeField" → "Export Bundle". WPF dialog (Dalux-like, keep it lean):
-1. Sheets picker (all sheets, checkbox; default = sheets that contain at least one plan viewport).
+1. Sheets picker. Default = ONLY sheets with at least one FloorPlan/EngineeringPlan viewport mapped to an IFC storey, plus unplaced floor-plan views; other sheets (cover, sections, details, legends…) are excluded unless `includeUnmappedSheets` (user directive 2026-11-21: FreeField maps floor plans to IFC levels; nothing else belongs in the bundle by default).
 2. Level ↔ storey preview (read-only in v1: storey name = level name).
 3. Options: include schedules, include element outlines, IFC options (IFC4 RV / IFC2x3 CV2.0; default IFC4),
    output folder.

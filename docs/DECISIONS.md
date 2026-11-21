@@ -25,3 +25,6 @@ Direct view PDF export sizes the page to the ink bbox (not derivable). The expor
 
 ## 2026-11-20 — IFC file units
 Revit writes IFC in the project length unit (FOOT for imperial projects). Coordinates remain exactly Revit internal * 0.3048 m after the unit conversion that web-ifc applies; no API change needed.
+
+## 2026-11-21 — Export and map only floor plans (user directive)
+FreeField maps plan PDFs to IFC levels, so a bundle contains only sheets with at least one FloorPlan/EngineeringPlan viewport (+ unplaced floor-plan views). Cover/section/elevation/detail/legend/3D sheets are excluded by default (`includeUnmappedSheets` opt-in). Ceiling/area plans are not mapped unless `mapCeilingAndAreaPlans`. Links to excluded sheets carry `targetIncluded:false`. Primary viewport per (sheet, storey) = largest model-area crop, so dependent/enlarged partial plans do not win.
