@@ -42,6 +42,16 @@ test('wrong transform (3 m shift) fails the geometric check only', async () => {
   assert.ok(Math.abs(r.viewports[0].medianErrM! - 3) < 0.05);
 });
 
+test('sheet without a mapped viewport FAILS when includeUnmappedSheets=false', async () => {
+  const r = await validateBundle(await makeFixture({ outPath: path.join(dir, 'unmapped-strict.ffbundle'), unmapped: { includeUnmappedSheets: false } }));
+  assert.ok(failing(r).includes('sheet A101 has a mapped viewport'), failing(r).join(','));
+});
+
+test('unmapped sheet is accepted when includeUnmappedSheets=true', async () => {
+  const r = await validateBundle(await makeFixture({ outPath: path.join(dir, 'unmapped-ok.ffbundle'), unmapped: { includeUnmappedSheets: true } }));
+  assert.ok(!failing(r).some((n) => n.includes('has a mapped viewport')), failing(r).join(','));
+});
+
 test('storey name missing in IFC fails', async () => {
   const r = await validateBundle(await makeFixture({ outPath: path.join(dir, 'bad-storey.ffbundle'), wrongStorey: true }));
   assert.equal(r.ok, false);

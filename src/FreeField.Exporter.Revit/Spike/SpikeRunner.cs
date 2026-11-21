@@ -33,6 +33,8 @@ public static class SpikeRunner
                     case "viewpdf": Save(outDir, "spike-viewpdf-" + job.Opt("viewId") + ".json", ViewPdf(doc, job, outDir)); break;
                     case "viewelems": Save(outDir, "spike-viewelems.json", ViewElems(doc, job)); break;
                     case "dialog": { var dlg = new ExportDialog(doc); dlg.Show(); dlg.Close(); Save(outDir, "spike-dialog.json", new { ok = true }); break; }
+                    case "viewvis": Save(outDir, "spike-viewvis.json", ViewVis(doc, job)); break;
+                    case "tempprobe": Save(outDir, "spike-tempprobe.json", TempProbe(doc, job, outDir)); break;
                     case "views": Save(outDir, "spike-views.json", Views(doc)); break;
                     case "mksheets": Save(outDir, "spike-mksheets.json", MakeSheets(doc, job, outDir)); break;
                     case "pdf": Save(outDir, "spike-pdf-" + job.Opt("sheet", "x") + ".json", Pdf(doc, job, outDir)); break;
@@ -227,6 +229,51 @@ public static class SpikeRunner
         }
         var secs = new FilteredElementCollector(doc).OfClass(typeof(View)).Cast<View>().Where(v => v.ViewType is ViewType.Section or ViewType.Elevation or ViewType.Detail || v.IsCallout).Select(v => v.Name + " | " + v.ViewType + " | callout=" + v.IsCallout + " | id=" + v.Id.Value).ToList();
         return new { res, secs, markers = new FilteredElementCollector(doc).OfClass(typeof(ElevationMarker)).Select(m => m.Id.Value).ToList() };
+    }
+
+    static object ViewVis(Document doc, Job job)
+    {
+        var res = new List<object>();
+        foreach (var name in job.Opt("viewNames").Split('|'))
+        {
+            var v = new FilteredElementCollector(doc).OfClass(typeof(View)).Cast<View>().FirstOrDefault(x => x.Name == name && !x.IsTemplate);
+            if (v == null) { res.Add(new { name, found = false }); continue; }
+            var walls = new FilteredElementCollector(doc, v.Id).OfCategory(BuiltInCategory.OST_Walls).WhereElementIsNotElementType().ToList();
+            var cat = Category.GetCategory(doc, BuiltInCategory.OST_Walls);
+            object? ov = null;
+            try { var o = v.GetCategoryOverrides(cat.Id); ov = new { halftone = o.Halftone, transp = o.Transparency, lw = o.ProjectionLineWeight, cutLw = o.CutLineWeight }; } catch { }
+            res.Add(new
+            {
+                name, found = true, type = v.ViewType.ToString(), detail = v.DetailLevel.ToString(), style = v.DisplayStyle.ToString(),
+                template = v.ViewTemplateId == ElementId.InvalidElementId ? null : doc.GetElement(v.ViewTemplateId)?.Name,
+                modelCatsHidden = v.AreModelCategoriesHidden, wallsHidden = SafeHidden(v, cat), wallCount = walls.Count,
+                filters = v.GetFilters().Select(f => new { n = doc.GetElement(f)?.Name, vis = v.GetFilterVisibility(f) }).ToList(), wallOverrides = ov,
+                discipline = v.Discipline.ToString(), crop = v.CropBoxActive, scale = v.Scale,
+                viewRange = (v as ViewPlan) is ViewPlan vp ? new { top = vp.GetViewRange().GetOffset(PlanViewPlane.TopClipPlane), cut = vp.GetViewRange().GetOffset(PlanViewPlane.CutPlane), bottom = vp.GetViewRange().GetOffset(PlanViewPlane.BottomClipPlane), depth = vp.GetViewRange().GetOffset(PlanViewPlane.ViewDepthPlane) } : null
+            });
+        }
+        return res;
+    }
+    static bool SafeHidden(View v, Category c) { try { return v.GetCategoryHidden(c.Id); } catch { return false; } }
+
+    static object TempProbe(Document doc, Job job, string outDir)
+    {
+        var res = new List<object>();
+        foreach (var name in job.Opt("viewNames").Split('|'))
+        {
+            var v = new FilteredElementCollector(doc).OfClass(typeof(ViewPlan)).Cast<ViewPlan>().FirstOrDefault(x => x.Name == name && !x.IsTemplate);
+            if (v == null) continue;
+            using var tg = new TransactionGroup(doc, "probe"); tg.Start();
+            ViewSheet sh; Viewport vp;
+            using (var t = new Transaction(doc, "mk")) { t.Start(); sh = ViewSheet.Create(doc, ElementId.InvalidElementId); var o0 = sh.Outline; vp = Viewport.Create(doc, sh.Id, v.Id, new XYZ((o0.Min.U + o0.Max.U) / 2, (o0.Min.V + o0.Max.V) / 2, 0)); t.Commit(); }
+            var o = sh.Outline; var bo = vp.GetBoxOutline(); var lo = vp.GetLabelOutline();
+            var tmp = Path.Combine(outDir, "probe-" + res.Count); Directory.CreateDirectory(tmp);
+            var pdf = Pipeline.ExportPipeline.ExportPdf(doc, sh, tmp, "p" + res.Count);
+            if (pdf != null) File.Copy(pdf, Path.Combine(outDir, "probe-" + res.Count + ".pdf"), true);
+            res.Add(new { name, outline = new[] { o.Min.U, o.Min.V, o.Max.U, o.Max.V }, box = new[] { bo.MinimumPoint.X, bo.MinimumPoint.Y, bo.MaximumPoint.X, bo.MaximumPoint.Y }, label = new[] { lo.MinimumPoint.X, lo.MinimumPoint.Y, lo.MaximumPoint.X, lo.MaximumPoint.Y }, boxCenter = P(vp.GetBoxCenter()), viewOutline = new[] { v.Outline.Min.U, v.Outline.Min.V, v.Outline.Max.U, v.Outline.Max.V }, p2s = Tf(vp.GetProjectionToSheetTransform()), scale = v.Scale, pdf = "probe-" + (res.Count) + ".pdf" });
+            tg.RollBack();
+        }
+        return res;
     }
 
     static object Views(Document doc)

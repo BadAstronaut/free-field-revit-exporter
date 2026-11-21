@@ -2,7 +2,7 @@
 .SYNOPSIS  Drives the real UI with Windows UI Automation: FreeField ribbon tab -> "Export Bundle" -> dialog -> Export.
            Revit must be running with a project open (and the add-in loaded). Writes the bundle into -OutFolder.
 #>
-param([string]$OutFolder = (Join-Path $env:LOCALAPPDATA "FreeFieldExporter\out\ui-$(Get-Date -Format yyyyMMdd-HHmmss)"), [int]$TimeoutSec = 1800)
+param([string]$Screenshot = "", [switch]$NoExport, [string]$OutFolder = (Join-Path $env:LOCALAPPDATA "FreeFieldExporter\out\ui-$(Get-Date -Format yyyyMMdd-HHmmss)"), [int]$TimeoutSec = 1800)
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 $AE = [System.Windows.Automation.AutomationElement]
 $TS = [System.Windows.Automation.TreeScope]
@@ -30,6 +30,17 @@ $dlg = $null
 for ($i = 0; $i -lt 30 -and -not $dlg; $i++) { Start-Sleep -Seconds 1; $dlg = Find ([System.Windows.Automation.AutomationElement]::RootElement) "FreeField - Export Bundle" ([System.Windows.Automation.ControlType]::Window) }
 if (-not $dlg) { throw "dialog did not appear" }
 Write-Host "dialog found"
+function Shot($el, $path) {
+  if (-not $path) { return }
+  Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+  $r = $el.Current.BoundingRectangle
+  $bmp = New-Object System.Drawing.Bitmap ([int]$r.Width), ([int]$r.Height)
+  $g = [System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen([int]$r.X, [int]$r.Y, 0, 0, $bmp.Size); $bmp.Save($path); $g.Dispose(); $bmp.Dispose()
+  Write-Host "screenshot: $path"
+}
+Start-Sleep -Seconds 2
+Shot $dlg $Screenshot
+if ($NoExport) { $c = Find $dlg "Close" ([System.Windows.Automation.ControlType]::Button); if ($c) { Invoke $c }; return }
 # set output folder: the only Edit control
 $edit = $dlg.FindFirst($TS::Descendants, (New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit)))
 $vp = $null

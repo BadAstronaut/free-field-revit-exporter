@@ -42,6 +42,8 @@ public static class ExportPipeline
             IncludeSchedules = job.Opt("schedules", "true") != "false",
             IncludeOutlines = job.Opt("outlines", "true") != "false",
             CheckDrawnGeometry = job.Opt("drawnGeometry", "true") != "false",
+            IfcCachePath = job.Opt("ifcCache"),
+            PlanViewNames = string.IsNullOrEmpty(job.Opt("viewNames")) ? null : new HashSet<string>(job.Opt("viewNames").Split('|')),
             IncludeSheets = job.Opt("includeSheets", "true") != "false",
             IncludePlanViewsNotOnSheets = job.Opt("planViews", "true") != "false",
             OutputPath = job.Output ?? "",
@@ -99,15 +101,20 @@ public static class ExportPipeline
             var planViews = new List<ViewPlan>();
             if (opt.IncludePlanViewsNotOnSheets)
                 foreach (var row in model0.Views)
-                    if (wantViewIds.Contains(row.ViewId) && survey.ViewById.TryGetValue(row.ViewId, out var pv)) planViews.Add(pv);
+                    if (wantViewIds.Contains(row.ViewId) && (opt.PlanViewNames == null || opt.PlanViewNames.Contains(row.ViewName)) && survey.ViewById.TryGetValue(row.ViewId, out var pv)) planViews.Add(pv);
             progress(3, "Selected " + pages.Count + " sheets and " + planViews.Count + " plan views");
             Stage("collect");
 
             // 2. IFC
             progress(5, "Exporting IFC");
             var ifcName = "model";
-            if (!IfcTools.Export(doc, work, ifcName, opt.IfcVersion, out var ifcErr)) throw new InvalidOperationException("IFC export failed: " + ifcErr);
             var ifcPath = Path.Combine(work, ifcName + ".ifc");
+            if (!string.IsNullOrEmpty(opt.IfcCachePath) && File.Exists(opt.IfcCachePath)) { File.Copy(opt.IfcCachePath, ifcPath, true); Log.Write("IFC reused from cache"); }
+            else
+            {
+                if (!IfcTools.Export(doc, work, ifcName, opt.IfcVersion, out var ifcErr)) throw new InvalidOperationException("IFC export failed: " + ifcErr);
+                if (!string.IsNullOrEmpty(opt.IfcCachePath) && File.Exists(ifcPath)) { try { File.Copy(ifcPath, opt.IfcCachePath, true); } catch { } }
+            }
             if (!File.Exists(ifcPath)) throw new InvalidOperationException("IFC export produced no file");
             Stage("ifc");
             var ifc = IfcTools.Scan(ifcPath);
@@ -154,9 +161,12 @@ public static class ExportPipeline
                         var num = "VIEW-" + BundleNaming.SanitizeFileStem(v.Name);
                         num = BundleNaming.MakeUnique(num, usedNumbers);
                         var o = sh.Outline;
-                        var vp = Viewport.Create(doc, sh.Id, v.Id, new XYZ((o.Min.U + o.Max.U) / 2, (o.Min.V + o.Max.V) / 2, 0));
+                        // Titleblock-less sheets: centre the viewport box on the sheet origin (the empty sheet's default outline must not
+                        // become part of the printed extents, or the page is enlarged and off-centre); with a titleblock centre on it.
+                        double tcx = tb == ElementId.InvalidElementId ? 0 : (o.Min.U + o.Max.U) / 2, tcy = tb == ElementId.InvalidElementId ? 0 : (o.Min.V + o.Max.V) / 2;
+                        var vp = Viewport.Create(doc, sh.Id, v.Id, new XYZ(tcx, tcy, 0));
                         var bo = vp.GetBoxOutline(); var c = vp.GetBoxCenter();
-                        vp.SetBoxCenter(new XYZ(c.X + ((o.Min.U + o.Max.U) / 2 - (bo.MinimumPoint.X + bo.MaximumPoint.X) / 2), c.Y + ((o.Min.V + o.Max.V) / 2 - (bo.MinimumPoint.Y + bo.MaximumPoint.Y) / 2), c.Z));
+                        vp.SetBoxCenter(new XYZ(c.X + (tcx - (bo.MinimumPoint.X + bo.MaximumPoint.X) / 2), c.Y + (tcy - (bo.MinimumPoint.Y + bo.MaximumPoint.Y) / 2), c.Z));
                         t.Commit();
                         var nbo = vp.GetBoxOutline();
                         if (tb != ElementId.InvalidElementId && (nbo.MaximumPoint.X - nbo.MinimumPoint.X > o.Max.U - o.Min.U + 1e-6 || nbo.MaximumPoint.Y - nbo.MinimumPoint.Y > o.Max.V - o.Min.V + 1e-6))
@@ -287,7 +297,10 @@ public static class ExportPipeline
             if (view.ViewType == ViewType.Legend || view.ViewType == ViewType.Schedule) { }
             Transform m2p = Transform.Identity;
             try { var tw = view.GetModelToProjectionTransforms(); if (tw.Count > 0) m2p = tw[0].GetModelToProjectionTransform(); } catch { }
-            var map = new PageMap(m2p, vp.GetProjectionToSheetTransform(), cx, cy, W, H);
+            Transform p2s;
+            try { p2s = vp.GetProjectionToSheetTransform(); }
+            catch (Exception ex) { warn($"{pg.Number}/{view.Name}: viewport skipped (no projection transform: {ex.Message})"); continue; }
+            var map = new PageMap(m2p, p2s, cx, cy, W, H);
             var bo = vp.GetBoxOutline();
             var c1 = map.SheetToPage(bo.MinimumPoint.X, bo.MaximumPoint.Y); var c2 = map.SheetToPage(bo.MaximumPoint.X, bo.MinimumPoint.Y);
             var region = new BBox2(Math.Min(c1.X, c2.X), Math.Min(c1.Y, c2.Y), Math.Max(c1.X, c2.X), Math.Max(c1.Y, c2.Y));
@@ -332,7 +345,9 @@ public static class ExportPipeline
                     if (!drawn.IsDrawn(e, bb)) continue;
                     if (!seen.Add((gid, ve.Id))) continue;
                     if (!records.ContainsKey(gid)) records[gid] = rb.Build(e, gid);
-                    index.Elements.Add(new SheetElement { Gid = gid, Vp = ve.Id, Bbox = pb.ToArray(), Outline = isPlan && opt.IncludeOutlines ? Outlines.Build(e, map) : null });
+                    double[][]? ol = null; var box = pb;
+                    if (isPlan && opt.IncludeOutlines) { ol = Outlines.Build(e, map, out var ob); if (ob != null) box = ob.Value; }   // box from the real solid geometry (same extent as the IFC geometry)
+                    index.Elements.Add(new SheetElement { Gid = gid, Vp = ve.Id, Bbox = box.ToArray(), Outline = ol });
                 }
                 catch { }
             }
@@ -348,6 +363,7 @@ public static class ExportPipeline
         foreach (var grp in vpEntries.Where(v => v.E.StoreyName != null).GroupBy(v => v.E.StoreyName))
             grp.OrderByDescending(v => v.Area).First().E.Primary = true;
         entry.Viewports = vpEntries.Select(v => v.E).ToList();
+        PageCalibrator.Calibrate(pg.Number, pg.Pdf!, entry, index, warn);
         manifest.Sheets.Add(entry);
         indexes.Add(index);
     }
@@ -414,7 +430,7 @@ public static class ExportPipeline
     // ---- helpers --------------------------------------------------------------------------
     public static bool IsPlan(ViewType t) => t is ViewType.FloorPlan or ViewType.EngineeringPlan or ViewType.CeilingPlan or ViewType.AreaPlan;
 
-    static string? ExportPdf(Document doc, ViewSheet sheet, string work, string stem)
+    public static string? ExportPdf(Document doc, ViewSheet sheet, string work, string stem)
     {
         var tmp = Path.Combine(work, stem);
         Directory.CreateDirectory(tmp);

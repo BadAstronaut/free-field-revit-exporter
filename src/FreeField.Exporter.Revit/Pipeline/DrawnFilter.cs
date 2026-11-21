@@ -14,11 +14,20 @@ public sealed class DrawnFilter
     readonly double _lo = double.NegativeInfinity, _hi = double.PositiveInfinity;
     readonly bool _useRange;
     readonly Options _opts;
+    readonly Document _doc;
+    readonly List<(HashSet<long> cats, ElementFilter filter)> _hiddenFilters = new();
     public int Hidden, OutOfRange, EmptyGeometry;
 
     public DrawnFilter(Document doc, View view, bool checkGeometry)
     {
         _view = view;
+        _doc = doc;
+        try
+        {
+            foreach (var id in view.GetFilters())
+                if (!view.GetFilterVisibility(id) && doc.GetElement(id) is ParameterFilterElement pf) _hiddenFilters.Add((pf.GetCategories().Select(c => c.Value).ToHashSet(), pf.GetElementFilter()));   // incl. filters inherited from the view template
+        }
+        catch { }
         CheckGeometry = checkGeometry;
         _opts = new Options { View = view, ComputeReferences = false, IncludeNonVisibleObjects = false };
         if (view is ViewPlan vp && view.ViewType != ViewType.CeilingPlan)
@@ -59,6 +68,10 @@ public sealed class DrawnFilter
             if (cat != null && _view.GetCategoryHidden(cat.Id)) { Hidden++; return false; }
         }
         catch { }
+        foreach (var (cats, filter) in _hiddenFilters)
+        {
+            try { if (e.Category != null && cats.Contains(e.Category.Id.Value) && (filter == null || filter.PassesFilter(_doc, e.Id))) { Hidden++; return false; } } catch { }
+        }
         if (_useRange)
         {
             var t = bb.Transform ?? Transform.Identity;

@@ -12,6 +12,10 @@ public sealed class ExportOptions
     public bool IncludeUnmappedSheets { get; set; }
     /// <summary>Polled between stages; when it returns true the export stops with OperationCanceledException.</summary>
     public Func<bool>? Cancel { get; set; }
+    /// <summary>Dev only: reuse (or create) a cached IFC file to skip the slow IFC export when iterating.</summary>
+    public string? IfcCachePath { get; set; }
+    /// <summary>Dev only: restrict unplaced plan views to these names.</summary>
+    public HashSet<string>? PlanViewNames { get; set; }
     public bool IncludeSheets { get; set; } = true;
     public bool IncludePlanViewsNotOnSheets { get; set; } = true;
     /// <summary>Also require non-empty view-specific geometry (Options{View=view}) for an element to be indexed.</summary>

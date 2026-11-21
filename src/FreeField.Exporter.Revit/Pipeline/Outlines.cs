@@ -13,15 +13,27 @@ public static class Outlines
     public const int MaxPoints = 64;
     static readonly Options Opts = new() { DetailLevel = ViewDetailLevel.Medium, ComputeReferences = false, IncludeNonVisibleObjects = false };
 
-    public static double[][]? Build(Element e, PageMap map)
+    public static double[][]? Build(Element e, PageMap map) => Build(e, map, out _);
+
+
+    /// <summary>Also returns <paramref name="bounds"/>: the page-space XY extent of ALL solid geometry of the element (every edge), i.e. the same extent the IFC geometry has. Null when the element has no solids.</summary>
+    public static double[][]? Build(Element e, PageMap map, out BBox2? bounds)
     {
+        bounds = null;
         try
         {
             var ge = e.get_Geometry(Opts);
             if (ge == null) return null;
             PlanarFace? best = null; double bestArea = 0; int bestDir = 0;
+            double gx0 = double.MaxValue, gy0 = double.MaxValue, gx1 = double.MinValue, gy1 = double.MinValue; bool anyGeo = false;
             foreach (var solid in Solids(ge))
             {
+                foreach (Edge ed in solid.Edges)
+                {
+                    var cv = ed.AsCurve();
+                    var pts3 = cv is Line ? new List<XYZ> { cv.GetEndPoint(0), cv.GetEndPoint(1) } : cv.Tessellate();
+                    foreach (var q in pts3) { var pp = map.ModelToPage(q); gx0 = Math.Min(gx0, pp.X); gx1 = Math.Max(gx1, pp.X); gy0 = Math.Min(gy0, pp.Y); gy1 = Math.Max(gy1, pp.Y); anyGeo = true; }
+                }
                 foreach (Face f in solid.Faces)
                 {
                     if (f is not PlanarFace pf) continue;
@@ -32,6 +44,7 @@ public static class Outlines
                     if (dir > bestDir || (dir == bestDir && a > bestArea)) { best = pf; bestArea = a; bestDir = dir; }
                 }
             }
+            if (anyGeo) bounds = new BBox2(gx0, gy0, gx1, gy1);
             if (best == null) return null;
             var loops = best.GetEdgesAsCurveLoops();
             if (loops.Count == 0) return null;

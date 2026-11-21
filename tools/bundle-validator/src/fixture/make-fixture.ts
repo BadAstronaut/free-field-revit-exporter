@@ -19,6 +19,8 @@ export interface FixtureOptions {
   wrongPageSize?: boolean;
   /** Do not embed freefield-sheet.json in the PDF. */
   noAttachment?: boolean;
+  /** Remove the viewport mapping (pdfToModel/storeyName) and record manifest.exportOptions.includeUnmappedSheets as given. */
+  unmapped?: { includeUnmappedSheets: boolean };
 }
 
 const BUILDING_OFFSET = [10, 20]; // metres; verifies placement chaining
@@ -138,8 +140,9 @@ export async function makeFixture(opts: FixtureOptions): Promise<string> {
     sheets: [{
       id: sheetId, number: 'A101', name: 'First Floor Plan', file: 'sheets/A101.pdf', data: 'data/sheets/A101.json',
       page: opts.wrongPageSize ? { widthPt: 1200, heightPt: 800 } : { widthPt: PAGE.w, heightPt: PAGE.h },
-      viewports: [vpEntry],
+      viewports: [opts.unmapped ? { ...vpEntry, pdfToModel: null, controlPoints: undefined, storeyName: undefined, modelId: undefined, primary: false } : vpEntry],
     }],
+    ...(opts.unmapped ? { exportOptions: { includeUnmappedSheets: opts.unmapped.includeUnmappedSheets } } : {}),
     schedules: [],
     elementsFile: 'data/elements.json',
     stats: { elements: Object.keys(elements).length, sheets: 1, viewports: 1, links: 1 },

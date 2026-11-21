@@ -202,12 +202,12 @@ public sealed class SheetSelectionModel
         return true;
     }
 
-    /// <summary>Rough bundle size: ~0.35 MB per exported page plus the IFC (about <paramref name="ifcMbPerRvtMb"/> x the rvt size).</summary>
-    public SelectionSummary Summary(double rvtMb = 0, double ifcMbPerRvtMb = 0.15)
+    /// <summary>Rough bundle size: ~0.65 MB per exported page (vector PDFs, calibrated on Snowdon Towers: 66 pages + 98 MB rvt = 61.5 MB bundle) plus the zipped IFC (about <paramref name="ifcMbPerRvtMb"/> x the rvt size).</summary>
+    public SelectionSummary Summary(double rvtMb = 0, double ifcMbPerRvtMb = 0.16)
     {
         var pages = Sheets.Count(s => s.Selected) + Views.Count(v => v.Selected);
         var mappedLevels = Levels.Count(l => l.HasPlanOnSelection && l.StoreyName != null);
-        return new SelectionSummary(Sheets.Count(s => s.Selected), mappedLevels, Views.Count(v => v.Selected), mappedLevels, Math.Round(pages * 0.35 + rvtMb * ifcMbPerRvtMb, 1));
+        return new SelectionSummary(Sheets.Count(s => s.Selected), mappedLevels, Views.Count(v => v.Selected), mappedLevels, Math.Round(pages * 0.65 + rvtMb * ifcMbPerRvtMb, 1));
     }
 
     public string SummaryLine(double rvtMb = 0)
