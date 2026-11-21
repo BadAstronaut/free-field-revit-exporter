@@ -1,16 +1,16 @@
-# Status and runbook (2026-11-20)
+﻿# Status and runbook (2026-11-20)
 
 ## Where things stand
 | Area | State | Evidence |
 |---|---|---|
 | Core lib + schema (`freefield.bundle/1`, `freefield.sheet/1`) | Done | 34/34 xUnit |
 | Bundle validator | Done | 8/8 tests; PASS on the real STRUCTURAL_CO bundle (6 plan viewports, 410/410 elements in tolerance, det ratio 1.000) |
-| Revit add-in (2025 default; 2026/2027 switchable) | Working end to end | headless export of STRUCTURAL_CO in ~24 s; sheet→page mapping proven to ≤0.13 pt; IFC = Revit internal coords ×0.3048 |
-| Plan views not on sheets → `VIEW-*` PDFs | Done | 4 pages in the real bundle |
-| Outlines, Revit schedules embedded per sheet, dialog smoke | Done, run live (v2) | bundle `out/run-20261120-232643`: validator PASS; outline vertices on PDF linework 97–100% on 5/6 plan pages (VIEW-CO-101 198/310, uninvestigated); framing (120 rows) + column (20 rows) schedules match Revit cell-for-cell via MCP; dialog code path ran headless |
+| Revit add-in (2025 default; 2026/2027 switchable) | Working end to end | headless export of STRUCTURAL_CO in ~24 s; sheetâ†’page mapping proven to â‰¤0.13 pt; IFC = Revit internal coords Ã—0.3048 |
+| Plan views not on sheets â†’ `VIEW-*` PDFs | Done | 4 pages in the real bundle |
+| Outlines, Revit schedules embedded per sheet, dialog smoke | Done, run live (v2) | bundle `out/run-20261120-232643`: validator PASS; outline vertices on PDF linework 97â€“100% on 5/6 plan pages (VIEW-CO-101 198/310, uninvestigated); framing (120 rows) + column (20 rows) schedules match Revit cell-for-cell via MCP; dialog code path ran headless |
 | FreeField importer (`free-field` branch `architect/ffbundle-import`, worktree `../free-field-bundle`) | Done, not pushed | real bundle: 6 calibrations, 410/410 elements within 0.5 m in FreeField world (median < 1 mm), idempotent re-import; browser walkthrough in Edge passed |
-| FreeField drawing data (tap → properties with outline highlight, sheet links + Back, elements table, CSV/XLSX, schedule tabs) | Done | component tests + browser on v2 bundle: 120-row schedule tab, XLSX 121 rows |
-| Rotated calibrations in LinkView | Done | UV-registered overlay tests at 0/25/90/−45/180°; top-down browser check at 25° |
+| FreeField drawing data (tap â†’ properties with outline highlight, sheet links + Back, elements table, CSV/XLSX, schedule tabs) | Done | component tests + browser on v2 bundle: 120-row schedule tab, XLSX 121 rows |
+| Rotated calibrations in LinkView | Done | UV-registered overlay tests at 0/25/90/âˆ’45/180Â°; top-down browser check at 25Â° |
 | Code review of importer branch | Done, all 7 important findings fixed | `docs/reports/review-ffbundle-import.md`; fixes c88aea5, 61b5fc4, 1b5c524 with failing-first tests; branch now 13 commits; settings 401, documents 78, linkview 101, ff-viewer-react 516, ff-viewer-tools 194, @ff/data 72 |
 | FreeField production build | App bundle builds (vite, 2713 modules) | full `pnpm build` fails on `main` too: test mock in ff-viewer-tools lacks `setMemoryPressure` (from main commit e64d8da) |
 
@@ -32,7 +32,7 @@
 # validate
 cd tools/bundle-validator; npm i; npm run build; node dist/cli.js <bundle> --report r.md
 ```
-FreeField: `pnpm --filter settings dev` in `../free-field-bundle` (demo auth), then Settings → PDFs → **Import bundle**.
+FreeField: `pnpm --filter settings dev` in `../free-field-bundle` (demo auth), then Settings â†’ PDFs â†’ **Import bundle**.
 Opt-in data e2e: `FF_E2E_BUNDLE=<bundle> NODE_OPTIONS="--import tsx" pnpm exec vitest run __tests__/bundle/e2e.realBundle.test.ts` (in `apps/settings`).
 
 ## Known limitations / next
