@@ -13,7 +13,7 @@ export async function vertices(file) {
   const vp = page.getViewport({ scale: 1 });
   const ops = await page.getOperatorList();
   const O = pdfjs.OPS;
-  let ctm = vp.transform.slice(); const stack = []; const pts = [];
+  let ctm = vp.transform.slice(); const stack = []; const pts = []; const segs = [];
   for (let i = 0; i < ops.fnArray.length; i++) {
     const fn = ops.fnArray[i], a = ops.argsArray[i];
     if (fn === O.save) stack.push(ctm.slice());
@@ -21,16 +21,21 @@ export async function vertices(file) {
     else if (fn === O.transform) ctm = mul(ctm, a);
     else if (fn === O.constructPath) {
       const [subops, c] = a; let k = 0;
-      const push = (x, y) => pts.push([ctm[0]*x+ctm[2]*y+ctm[4], ctm[1]*x+ctm[3]*y+ctm[5]]);
+      // segs = straight line segments [x0,y0,x1,y1] (curves contribute only their end vertex): lets callers test "lies on linework",
+      // since Revit merges collinear edges into one long line whose interior vertices do not exist in the PDF.
+      let cur = null, start = null;
+      const push = (x, y, line) => { const q = [ctm[0]*x+ctm[2]*y+ctm[4], ctm[1]*x+ctm[3]*y+ctm[5]]; pts.push(q); if (line && cur) segs.push([cur[0], cur[1], q[0], q[1]]); cur = q; return q; };
       for (const op of subops) {
-        if (op === O.moveTo || op === O.lineTo) { push(c[k], c[k+1]); k += 2; }
+        if (op === O.moveTo) { start = push(c[k], c[k+1], false); k += 2; }
+        else if (op === O.lineTo) { push(c[k], c[k+1], true); k += 2; }
+        else if (op === O.closePath) { if (cur && start) { segs.push([cur[0], cur[1], start[0], start[1]]); cur = start; } }
         else if (op === O.curveTo) { push(c[k+4], c[k+5]); k += 6; }
         else if (op === O.curveTo2 || op === O.curveTo3) { push(c[k+2], c[k+3]); k += 4; }
-        else if (op === O.rectangle) { const x=c[k],y=c[k+1],w=c[k+2],h=c[k+3]; push(x,y); push(x+w,y); push(x+w,y+h); push(x,y+h); k += 4; }
+        else if (op === O.rectangle) { const x=c[k],y=c[k+1],w=c[k+2],h=c[k+3]; start = push(x,y,false); push(x+w,y,true); push(x+w,y+h,true); push(x,y+h,true); segs.push([cur[0], cur[1], start[0], start[1]]); cur = start; k += 4; }
       }
     }
   }
-  return { width: vp.width, height: vp.height, view: page.view, rotate: page.rotate, pts };
+  return { width: vp.width, height: vp.height, view: page.view, rotate: page.rotate, pts, segs };
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const r = await vertices(process.argv[2]);
