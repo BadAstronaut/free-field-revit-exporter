@@ -48,6 +48,13 @@
     "sheets": { "type": "array", "items": { "$ref": "#/$defs/SheetEntry" } },
     "schedules": { "type": "array", "items": { "$ref": "#/$defs/ScheduleEntry" } },
     "elementsFile": { "type": "string", "minLength": 1 },
+    "exportOptions": {
+      "type": "object",
+      "properties": {
+        "includeUnmappedSheets": { "type": "boolean" },
+        "mapCeilingAndAreaPlans": { "type": "boolean" }
+      }
+    },
     "stats": {
       "type": "object",
       "required": ["elements", "sheets", "viewports", "links"],
@@ -210,7 +217,8 @@
         "bbox": { "$ref": "#/$defs/Number4" },
         "targetSheetId": { "type": ["string", "null"] },
         "targetSheetNumber": { "type": ["string", "null"] },
-        "targetViewId": { "type": ["string", "null"] }
+        "targetViewId": { "type": ["string", "null"] },
+        "targetIncluded": { "type": "boolean" }
       }
     },
     "SheetElementIndex": {

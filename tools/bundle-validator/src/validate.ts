@@ -191,6 +191,14 @@ export async function validateBundle(bundlePath: string, opts: Partial<Options> 
       for (const [k, n] of seen) if (n > 1) add(`primary viewport ${s.number}`, 'WARN', `${n} primary viewports for ${k}`);
     }
 
+    // ---- every exported sheet must carry a mapped viewport unless unmapped sheets were explicitly included
+    if (manifest.exportOptions && manifest.exportOptions.includeUnmappedSheets === false) {
+      for (const s of manifest.sheets ?? []) {
+        const mapped = s.viewports.some((v) => v.pdfToModel && v.storeyName);
+        add(`sheet ${s.number} has a mapped viewport`, mapped ? 'PASS' : 'FAIL', mapped ? 'ok' : 'no mapped floor-plan viewport but includeUnmappedSheets=false');
+      }
+    }
+
     // ---- models: storeys
     const planVps = (manifest.sheets ?? []).flatMap((s) => s.viewports.filter((v) => v.pdfToModel).map((v) => ({ s, v })));
     const modelIdsUsed = [...new Set(planVps.map((x) => x.v.modelId!).filter(Boolean))];

@@ -16,6 +16,15 @@ public sealed class BundleManifest
     [JsonPropertyName("schedules")] public List<ScheduleEntry> Schedules { get; set; } = new();
     [JsonPropertyName("elementsFile")] public string ElementsFile { get; set; } = "data/elements.json";
     [JsonPropertyName("stats")] public BundleStats Stats { get; set; } = new();
+    /// <summary>How the export was configured (optional).</summary>
+    [JsonPropertyName("exportOptions")] public ExportOptionsInfo? ExportOptions { get; set; }
+}
+
+public sealed class ExportOptionsInfo
+{
+    /// <summary>True when sheets with no mapped floor plan were exported as unmapped documents.</summary>
+    [JsonPropertyName("includeUnmappedSheets")] public bool IncludeUnmappedSheets { get; set; }
+    [JsonPropertyName("mapCeilingAndAreaPlans")] public bool MapCeilingAndAreaPlans { get; set; }
 }
 
 public sealed class GeneratorInfo
@@ -171,6 +180,8 @@ public sealed class SheetLink
     [JsonPropertyName("targetSheetId")] public string? TargetSheetId { get; set; }
     [JsonPropertyName("targetSheetNumber")] public string? TargetSheetNumber { get; set; }
     [JsonPropertyName("targetViewId")] public string? TargetViewId { get; set; }
+    /// <summary>False when the target sheet exists in the model but was not exported (link is non-navigable). Omitted = true.</summary>
+    [JsonPropertyName("targetIncluded")] public bool? TargetIncluded { get; set; }
 }
 
 public sealed class DataTable

@@ -100,3 +100,23 @@ public class GeometryTests
         }
     }
 }
+
+public class PlanVisibilityTests
+{
+    [Theory]
+    [InlineData(-1.5, 0.0, 0.0, 10.0, true)]      // beam top touches the view depth: drawn
+    [InlineData(-5.5, -4.0, 0.0, 10.0, false)]    // footing entirely below view depth
+    [InlineData(-4.0, 28.0, 0.0, 10.0, true)]     // column spanning the range
+    [InlineData(11.0, 12.0, 0.0, 10.0, false)]    // entirely above the top clip plane
+    [InlineData(-1.5, -0.1, 0.0, 10.0, false)]    // just below
+    public void IntersectsViewRange_Cases(double zMin, double zMax, double lo, double hi, bool expected)
+        => Assert.Equal(expected, FreeField.Exporter.Core.Geometry.PlanVisibility.IntersectsViewRange(zMin, zMax, lo, hi));
+
+    [Fact]
+    public void IntersectsViewRange_UnlimitedAndSwapped()
+    {
+        Assert.True(FreeField.Exporter.Core.Geometry.PlanVisibility.IntersectsViewRange(-100, -50, double.NegativeInfinity, 5));
+        Assert.True(FreeField.Exporter.Core.Geometry.PlanVisibility.IntersectsViewRange(3, -3, 2, 10)); // swapped element args
+        Assert.True(FreeField.Exporter.Core.Geometry.PlanVisibility.IntersectsViewRange(0, 1, 5, -5));  // swapped range args
+    }
+}

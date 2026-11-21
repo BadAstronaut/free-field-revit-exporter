@@ -4,6 +4,7 @@ using Autodesk.Revit.UI;
 using FreeField.Exporter.Core;
 using FreeField.Exporter.Core.Geometry;
 using FreeField.Exporter.Core.Model;
+using FreeField.Exporter.Core.Selection;
 using FreeField.Exporter.Revit.Automation;
 
 namespace FreeField.Exporter.Revit.Pipeline;
@@ -35,9 +36,12 @@ public static class ExportPipeline
         var opt = new ExportOptions
         {
             Sheets = job.Sheets == null ? null : new HashSet<string>(job.Sheets),
+            IncludeUnmappedSheets = job.Opt("includeUnmappedSheets") == "true",
+            MapCeilingAndAreaPlans = job.Opt("mapCeilingAndAreaPlans") == "true",
             IfcVersion = job.Opt("ifcVersion", "IFC4RV"),
             IncludeSchedules = job.Opt("schedules", "true") != "false",
             IncludeOutlines = job.Opt("outlines", "true") != "false",
+            CheckDrawnGeometry = job.Opt("drawnGeometry", "true") != "false",
             IncludeSheets = job.Opt("includeSheets", "true") != "false",
             IncludePlanViewsNotOnSheets = job.Opt("planViews", "true") != "false",
             OutputPath = job.Output ?? "",
@@ -75,30 +79,28 @@ public static class ExportPipeline
         res.BundlePath = bundlePath;
         try
         {
-            // 1. collect
+            // 1. collect (pure selection model shared with the dialog)
             progress(2, "Collecting sheets and views");
-            var onSheetViewIds = new HashSet<long>();
-            var allSheets = new FilteredElementCollector(doc).OfClass(typeof(ViewSheet)).Cast<ViewSheet>().Where(s => !s.IsPlaceholder).OrderBy(s => s.SheetNumber).ToList();
+            var survey = Survey.Collect(doc);
+            var selOpts = new SelectionOptions { MapCeilingAndAreaPlans = opt.MapCeilingAndAreaPlans, IncludeUnmappedSheets = opt.IncludeUnmappedSheets };
+            var model0 = new SheetSelectionModel(survey.Sheets, survey.UnplacedViews, survey.Levels, selOpts);
+            bool explicitSheets = opt.Sheets != null;
+            var wantSheets = opt.Sheets ?? model0.SelectedSheets.Select(r => r.Sheet.Number).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var wantViewIds = opt.PlanViews ?? model0.SelectedViews.Select(v => v.ViewId).ToHashSet();
             var pages = new List<Page>();
-            foreach (var s in allSheets)
+            var otherSheetOfView = new Dictionary<long, (string Id, string Number)>();   // views on sheets that are NOT exported (for non-navigable links)
+            foreach (var kv in survey.SheetByNumber.OrderBy(k => k.Key, StringComparer.OrdinalIgnoreCase))
             {
+                var s = kv.Value;
                 var vps = s.GetAllViewports().Select(id => doc.GetElement(id)).OfType<Viewport>().ToList();
-                foreach (var vp in vps) onSheetViewIds.Add(vp.ViewId.Value);
-                bool hasView = vps.Any(vp => doc.GetElement(vp.ViewId) is View v && v.ViewType != ViewType.Legend);
-                bool want = opt.IncludeSheets && (opt.Sheets == null ? hasView : opt.Sheets.Contains(s.SheetNumber));
-                if (want) pages.Add(new Page { Number = s.SheetNumber, Name = s.Name, Id = s.UniqueId, Sheet = s, Viewports = vps });
+                if (opt.IncludeSheets && wantSheets.Contains(s.SheetNumber)) pages.Add(new Page { Number = s.SheetNumber, Name = s.Name, Id = s.UniqueId, Sheet = s, Viewports = vps });
+                else foreach (var vp in vps) otherSheetOfView[vp.ViewId.Value] = (s.UniqueId, s.SheetNumber);
             }
             var planViews = new List<ViewPlan>();
             if (opt.IncludePlanViewsNotOnSheets)
-            {
-                foreach (var v in new FilteredElementCollector(doc).OfClass(typeof(ViewPlan)).Cast<ViewPlan>())
-                {
-                    if (v.IsTemplate || !IsPlan(v.ViewType) || onSheetViewIds.Contains(v.Id.Value) || v.GenLevel == null && v.ViewType != ViewType.AreaPlan) continue;
-                    if (opt.PlanViews != null && !opt.PlanViews.Contains(v.Id.Value)) continue;
-                    planViews.Add(v);
-                }
-                planViews = planViews.OrderBy(v => v.Name).ToList();
-            }
+                foreach (var row in model0.Views)
+                    if (wantViewIds.Contains(row.ViewId) && survey.ViewById.TryGetValue(row.ViewId, out var pv)) planViews.Add(pv);
+            progress(3, "Selected " + pages.Count + " sheets and " + planViews.Count + " plan views");
             Stage("collect");
 
             // 2. IFC
@@ -110,6 +112,29 @@ public static class ExportPipeline
             Stage("ifc");
             var ifc = IfcTools.Scan(ifcPath);
             Stage("ifcScan");
+            if (opt.Cancel?.Invoke() == true) throw new OperationCanceledException();
+
+            // reconcile with the storeys the IFC really contains
+            bool LevelInIfc(string? n) => n != null && ifc.StoreyGuidByName.ContainsKey(n);
+            planViews = planViews.Where(v =>
+            {
+                bool ok = LevelInIfc(v.GenLevel?.Name);
+                if (!ok) Warn($"plan view '{v.Name}' skipped: level '{v.GenLevel?.Name}' is not an IfcBuildingStorey in the export");
+                return ok;
+            }).ToList();
+            {
+                var keep = new List<Page>();
+                foreach (var pg in pages)
+                {
+                    bool mapped = pg.Viewports.Any(vp => doc.GetElement(vp.ViewId) is ViewPlan v && SheetSelectionModel.IsMappedType(v.ViewType.ToString(), selOpts) && LevelInIfc(v.GenLevel?.Name));
+                    bool wasMappable = model0.Sheets.FirstOrDefault(r => r.Sheet.Number == pg.Number)?.IsMappable == true;
+                    if (mapped) keep.Add(pg);
+                    else if (wasMappable) Warn($"sheet {pg.Number} excluded: its floor-plan level is not an IfcBuildingStorey in the export");
+                    else if (explicitSheets || opt.IncludeUnmappedSheets) keep.Add(pg);   // explicitly chosen unmapped document
+                    else Warn($"sheet {pg.Number} excluded: no floor plan whose level is an IfcBuildingStorey");
+                }
+                pages = keep;
+            }
 
             // 3. temp sheets for unplaced plan views (rolled back at the end)
             TransactionGroup? tg = null;
@@ -146,6 +171,7 @@ public static class ExportPipeline
                 int pi = 0;
                 foreach (var pg in pages)
                 {
+                    if (opt.Cancel?.Invoke() == true) throw new OperationCanceledException();
                     progress(10 + 40 * pi++ / Math.Max(1, pages.Count), $"PDF {pg.Number}");
                     pg.Pdf = ExportPdf(doc, pg.Sheet, work, "p" + pi);
                     if (pg.Pdf == null) Warn($"PDF export failed for {pg.Number}");
@@ -167,8 +193,9 @@ public static class ExportPipeline
                 var pagesByNum = new Dictionary<string, Page>();
                 foreach (var pg in pages)
                 {
+                    if (opt.Cancel?.Invoke() == true) throw new OperationCanceledException();
                     progress(50 + 35 * done++ / Math.Max(1, pages.Count), $"Mapping {pg.Number}");
-                    BuildPage(doc, pg, ifc, modelId, rb, records, viewToPage, markerMap, manifest, indexes, Warn, opt);
+                    BuildPage(doc, pg, ifc, modelId, rb, records, viewToPage, otherSheetOfView, markerMap, manifest, indexes, Warn, opt);
                 }
                 Stage("geometry");
                 var storeysUsed = manifest.Sheets.SelectMany(s => s.Viewports).Select(v => v.StoreyName).Where(n => n != null).Distinct().ToList();
@@ -200,6 +227,11 @@ public static class ExportPipeline
                     model.Storeys.Add(new StoreyEntry { Name = lvl.Name, Elevation = lvl.Elevation * PageMap.MetresPerFt, LevelUniqueId = lvl.UniqueId, IfcGlobalId = sg });
                 }
                 manifest.Models.Add(model);
+                manifest.ExportOptions = new ExportOptionsInfo
+                {
+                    IncludeUnmappedSheets = manifest.Sheets.Any(sh => !sh.Viewports.Any(v => v.PdfToModel != null)),
+                    MapCeilingAndAreaPlans = opt.MapCeilingAndAreaPlans,
+                };
                 using (var bw = new BundleWriter(bundlePath))
                 {
                     bw.AddModelFile(modelId, ifcPath);
@@ -222,7 +254,7 @@ public static class ExportPipeline
 
     // ---- per page -------------------------------------------------------------------------
     static void BuildPage(Document doc, Page pg, IfcInfo ifc, string modelId, RecordBuilder rb, Dictionary<string, ElementRecord> records,
-        Dictionary<long, Page> viewToPage, Dictionary<long, View> markerMap, BundleManifest manifest, List<SheetElementIndex> indexes, Action<string> warn, ExportOptions opt)
+        Dictionary<long, Page> viewToPage, Dictionary<long, (string Id, string Number)> others, Dictionary<long, View> markerMap, BundleManifest manifest, List<SheetElementIndex> indexes, Action<string> warn, ExportOptions opt)
     {
         var pdfInfo = PdfTools.GetPageInfo(pg.Pdf!);
         double W = pdfInfo.WidthPt, H = pdfInfo.HeightPt;
@@ -260,12 +292,13 @@ public static class ExportPipeline
             var c1 = map.SheetToPage(bo.MinimumPoint.X, bo.MaximumPoint.Y); var c2 = map.SheetToPage(bo.MaximumPoint.X, bo.MinimumPoint.Y);
             var region = new BBox2(Math.Min(c1.X, c2.X), Math.Min(c1.Y, c2.Y), Math.Max(c1.X, c2.X), Math.Max(c1.Y, c2.Y));
             var isPlan = IsPlan(view.ViewType);
+            var isMapped = isPlan && SheetSelectionModel.IsMappedType(view.ViewType.ToString(), new SelectionOptions { MapCeilingAndAreaPlans = opt.MapCeilingAndAreaPlans });
             var ve = new ViewportEntry
             {
                 Id = vp.UniqueId, ViewId = view.UniqueId, ViewName = view.Name, ViewType = view.ViewType.ToString(), Scale = view.Scale,
                 PdfRegion = region.ToArray(),
             };
-            if (isPlan)
+            if (isMapped)
             {
                 var lvl = (view as ViewPlan)?.GenLevel;
                 var a = map.PdfToModelMetres();
@@ -276,12 +309,14 @@ public static class ExportPipeline
                 }
                 else warn($"{pg.Number}/{view.Name}: no calibration (level '{lvl?.Name}' not in IFC storeys or singular transform)");
             }
-            vpEntries.Add((ve, region.Width * region.Height));
+            // model area covered by the viewport (m2): used to pick the primary viewport per level (largest model area, not page area)
+            vpEntries.Add((ve, region.Width / PageMap.PtPerFt * (region.Height / PageMap.PtPerFt) * view.Scale * (double)view.Scale * 0.09290304));
 
             bool perspective = view is View3D v3 && v3.IsPerspective;
             if (view.ViewType is ViewType.Legend or ViewType.Schedule or ViewType.DraftingView or ViewType.Rendering || perspective) continue;
 
-            // elements
+            // elements (only those actually drawn in this view)
+            var drawn = new DrawnFilter(doc, view, opt.CheckDrawnGeometry);
             foreach (var e in new FilteredElementCollector(doc, view.Id).WhereElementIsNotElementType())
             {
                 try
@@ -294,6 +329,7 @@ public static class ExportPipeline
                     if (bb == null) continue;
                     var pb = map.ProjectBox(bb);
                     if (pb.MaxX < region.MinX || pb.MinX > region.MaxX || pb.MaxY < region.MinY || pb.MinY > region.MaxY) continue;
+                    if (!drawn.IsDrawn(e, bb)) continue;
                     if (!seen.Add((gid, ve.Id))) continue;
                     if (!records.ContainsKey(gid)) records[gid] = rb.Build(e, gid);
                     index.Elements.Add(new SheetElement { Gid = gid, Vp = ve.Id, Bbox = pb.ToArray(), Outline = isPlan && opt.IncludeOutlines ? Outlines.Build(e, map) : null });
@@ -301,8 +337,10 @@ public static class ExportPipeline
                 catch { }
             }
 
+            if (drawn.Hidden + drawn.OutOfRange + drawn.EmptyGeometry > 0) Log.Write($"{pg.Number}/{view.Name}: dropped not-drawn elements hidden={drawn.Hidden} outOfRange={drawn.OutOfRange} emptyGeom={drawn.EmptyGeometry}");
+
             // links
-            foreach (var l in Links(doc, view, map, viewToPage, markerMap, region, pg))
+            foreach (var l in Links(doc, view, map, viewToPage, others, markerMap, region, pg))
                 if (linkSeen.Add(l.TargetViewId + "|" + l.Kind + "|" + (int)l.Bbox[0] + "," + (int)l.Bbox[1])) index.Links.Add(l);
         }
 
@@ -314,7 +352,7 @@ public static class ExportPipeline
         indexes.Add(index);
     }
 
-    static IEnumerable<SheetLink> Links(Document doc, View view, PageMap map, Dictionary<long, Page> viewToPage, Dictionary<long, View> markerMap, BBox2 region, Page self)
+    static IEnumerable<SheetLink> Links(Document doc, View view, PageMap map, Dictionary<long, Page> viewToPage, Dictionary<long, (string Id, string Number)> others, Dictionary<long, View> markerMap, BBox2 region, Page self)
     {
         var found = new List<(ElementId target, string kind, BoundingBoxXYZ bb)>();
         foreach (var e in new FilteredElementCollector(doc, view.Id).WhereElementIsNotElementType())
@@ -344,12 +382,15 @@ public static class ExportPipeline
         {
             var kind = kind0;
         {
-            if (!viewToPage.TryGetValue(target.Value, out var tp) || tp == self) continue;
+            Page? tp = null; (string Id, string Number) other = default; bool included = true;
+            if (viewToPage.TryGetValue(target.Value, out tp)) { if (tp == self) continue; }
+            else if (others.TryGetValue(target.Value, out other)) included = false;
+            else continue;
             var pb = map.ProjectBox(bb);
             if (pb.MaxX < region.MinX || pb.MinX > region.MaxX || pb.MaxY < region.MinY || pb.MinY > region.MaxY) continue;
             var tvw = doc.GetElement(target) as View;
             if (kind.Length == 0 && tvw != null) kind = tvw.IsCallout ? "callout" : tvw.ViewType switch { ViewType.Section => "section", ViewType.Elevation => "elevation", ViewType.Detail => "detail", _ => "view" };
-            yield return new SheetLink { Kind = kind, Bbox = pb.ToArray(), TargetSheetId = tp.Id, TargetSheetNumber = tp.Number, TargetViewId = tvw?.UniqueId };
+            yield return new SheetLink { Kind = kind, Bbox = pb.ToArray(), TargetSheetId = included ? tp!.Id : other.Id, TargetSheetNumber = included ? tp!.Number : other.Number, TargetViewId = tvw?.UniqueId, TargetIncluded = included ? null : false };
         }
         }
     }

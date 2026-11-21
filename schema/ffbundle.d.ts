@@ -24,6 +24,7 @@ export interface BundleManifest {
   schedules: ScheduleEntry[];
   elementsFile: string; // "data/elements.json"
   stats: { elements: number; sheets: number; viewports: number; links: number };
+  exportOptions?: { includeUnmappedSheets?: boolean; mapCeilingAndAreaPlans?: boolean };
 }
 
 export interface ModelEntry {
@@ -123,6 +124,7 @@ export interface SheetLink {
   targetSheetId?: string | null;
   targetSheetNumber?: string | null;
   targetViewId?: string | null;
+  targetIncluded?: boolean; // false = target sheet exists but was not exported (non-navigable)
 }
 
 // data/schedules/<slug>.json
