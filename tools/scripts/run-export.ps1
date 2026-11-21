@@ -46,6 +46,6 @@ if (Test-Path $res) {
   if ($r.error) { Write-Host ($r.error.ToString().Substring(0, [Math]::Min(800, $r.error.ToString().Length))) }
   Write-Host "result: $res"
 } else { Write-Host "TIMEOUT/no result" }
-if (-not $KeepOpen) {
+if (-not $KeepOpen -and (Test-Path $res)) {
   if (-not $p.WaitForExit(60000)) { Write-Host "Revit still running after exit request (killing; work copy only)"; $p.Kill() }
 }

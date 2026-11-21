@@ -184,7 +184,7 @@ public static class ExportPipeline
                         if (!l.Contains(pg.Id)) l.Add(pg.Id);
                     }
                 if (tg != null) { tg.RollBack(); tg = null; }
-                if (opt.IncludeSchedules) { progress(86, "Schedules"); schedules = ScheduleExporter.Export(doc, ifc.GlobalIds, records, rb, Warn, placedMap); }
+                if (opt.IncludeSchedules) { progress(86, "Schedules"); schedules = ScheduleExporter.Export(doc, ifc.GlobalIds, records, rb, m => { if (m.Contains("failed")) Warn(m); else Log.Write(m); }, placedMap); }
                 Stage("schedules");
 
                 // 7. manifest + bundle
@@ -226,11 +226,23 @@ public static class ExportPipeline
     {
         var pdfInfo = PdfTools.GetPageInfo(pg.Pdf!);
         double W = pdfInfo.WidthPt, H = pdfInfo.HeightPt;
+        // Reference box = titleblock bbox (the PDF paper follows the titleblock); ViewSheet.Outline also grows with anything placed
+        // beyond it (e.g. a tall schedule) and then no longer matches the page. Titleblock-less sheets use Outline.
         var o = pg.Sheet.Outline;
-        double cx = (o.Min.U + o.Max.U) / 2, cy = (o.Min.V + o.Max.V) / 2;
+        double bx0 = o.Min.U, by0 = o.Min.V, bx1 = o.Max.U, by1 = o.Max.V;
+        {
+            double tx0 = double.MaxValue, ty0 = double.MaxValue, tx1 = double.MinValue, ty1 = double.MinValue;
+            foreach (var tb in new FilteredElementCollector(doc, pg.Sheet.Id).OfCategory(BuiltInCategory.OST_TitleBlocks).WhereElementIsNotElementType())
+            {
+                var bb = tb.get_BoundingBox(pg.Sheet); if (bb == null) continue;
+                tx0 = Math.Min(tx0, bb.Min.X); ty0 = Math.Min(ty0, bb.Min.Y); tx1 = Math.Max(tx1, bb.Max.X); ty1 = Math.Max(ty1, bb.Max.Y);
+            }
+            if (tx1 > tx0 && ty1 > ty0) { bx0 = tx0; by0 = ty0; bx1 = tx1; by1 = ty1; }
+        }
+        double cx = (bx0 + bx1) / 2, cy = (by0 + by1) / 2;
         // Centre alignment holds even when the page is larger than the outline (sheets without titleblock get a symmetric margin).
-        if (W + 3 < (o.Max.U - o.Min.U) * PageMap.PtPerFt || H + 3 < (o.Max.V - o.Min.V) * PageMap.PtPerFt || (!pg.Temp && (Math.Abs((o.Max.U - o.Min.U) * PageMap.PtPerFt - W) > 3 || Math.Abs((o.Max.V - o.Min.V) * PageMap.PtPerFt - H) > 3)))
-            warn($"{pg.Number}: PDF page {W:F1}x{H:F1}pt differs from sheet outline {(o.Max.U - o.Min.U) * PageMap.PtPerFt:F1}x{(o.Max.V - o.Min.V) * PageMap.PtPerFt:F1}pt; mapping may be off");
+        if (W + 3 < (bx1 - bx0) * PageMap.PtPerFt || H + 3 < (by1 - by0) * PageMap.PtPerFt || (!pg.Temp && (Math.Abs((bx1 - bx0) * PageMap.PtPerFt - W) > 3 || Math.Abs((by1 - by0) * PageMap.PtPerFt - H) > 3)))
+            warn($"{pg.Number}: PDF page {W:F1}x{H:F1}pt differs from sheet reference box {(bx1 - bx0) * PageMap.PtPerFt:F1}x{(by1 - by0) * PageMap.PtPerFt:F1}pt; mapping may be off");
         var entry = new SheetEntry { Id = pg.Id, Number = pg.Number, Name = pg.Name, Page = new PageSize { WidthPt = W, HeightPt = H } };
         var index = new SheetElementIndex { SheetId = pg.Id };
         var seen = new HashSet<(string, string)>();

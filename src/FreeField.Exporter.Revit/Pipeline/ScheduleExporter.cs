@@ -19,6 +19,7 @@ public static class ScheduleExporter
                 if (def.CategoryId == ElementId.InvalidElementId) continue; // multi-category / revision-type
                 var fields = new List<ScheduleField>();
                 for (int i = 0; i < def.GetFieldCount(); i++) { var f = def.GetField(i); if (!f.IsHidden) fields.Add(f); }
+                try { s.RefreshData(); } catch { }
                 var body = s.GetTableData().GetSectionData(SectionType.Body);
                 int nr = body.NumberOfRows, nc = body.NumberOfColumns;
                 var catName = Category.GetCategory(doc, def.CategoryId)?.Name ?? "";
@@ -44,8 +45,9 @@ public static class ScheduleExporter
                 for (int r = 0; r < nr; r++)
                 {
                     var cells = new List<string>();
-                    for (int c = 0; c < nc; c++) cells.Add(body.GetCellText(r, c) ?? "");
+                    for (int c = 0; c < nc; c++) cells.Add(s.GetCellText(SectionType.Body, r, c) ?? "");
                     if (cells.All(string.IsNullOrEmpty)) continue;
+                    if (r == 0 && cells.SequenceEqual(table.Columns.Select(c => c.Heading))) continue;   // column heading row
                     var row = new DataRow { Cells = cells };
                     if (sigs.TryGetValue(string.Join("\u001f", cells), out var q) && q.Count > 0)
                     {
