@@ -16,7 +16,7 @@ Not an exporter bug. Two causes:
 |---|---|---|---|
 | Structural columns 12x24 | 20 | 80/80 | 240/240 |
 | Structural framing (beams) 12x18 | 30 | 71/120 | 180/360 (all 15 horizontal beams' end faces at columns hit; long edges not drawn) |
-| Structural foundation (footings, level T.O. FOOTING) | 20 | 33/86 (coincidental: grid dashes / column edges) | 99/240 |
+| Structural foundation (footings, level T.O. FOOTING) | 20 | 33/86 (coincidental: grid dashes / column edges) | 120/258 |
 | Edge slab "Thickened 24x12" | 6 | 14/24 | 22/72 |
 
 * Miss distance distribution (112 missed vertices): quartiles 1.5 / 3.6 / 13.0 / 46.7 pt, max 48 pt. Footings: bimodal, 36.3 pt (96" footing) and 47.4 pt
@@ -28,7 +28,7 @@ Not an exporter bug. Two causes:
   So in CO-101 beams, footings and slab edge are not drawn with their edges (below/above the view range, hidden-line/dashed or centreline-only);
   the exported outline is the model footprint of the element, which is exactly what the spec defines.
 * FF-101 shows the *same level* through a different view whose graphics draw them: footings 58/70, beams 76/84 (edge cover 93 %).
-  Operator count also differs: CO-101 1084 paths, FF-101 3102 paths; CO-101 has no filled/hatched items for them.
+  Operator count also differs: CO-101 1084 paths, FF-101 3102 paths.
 * All other plan pages: edge cover 97-100 %.
 
 Diagnostic image (outline overlay: red footings, green beams, blue columns, magenta slab edges; grey dots = PDF vertices):
