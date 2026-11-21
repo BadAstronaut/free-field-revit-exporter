@@ -35,6 +35,22 @@ public static class SpikeRunner
                     case "dialog": { var dlg = new ExportDialog(doc); dlg.Show(); dlg.Close(); Save(outDir, "spike-dialog.json", new { ok = true }); break; }
                     case "viewvis": Save(outDir, "spike-viewvis.json", ViewVis(doc, job)); break;
                     case "tempprobe": Save(outDir, "spike-tempprobe.json", TempProbe(doc, job, outDir)); break;
+                    case "clickbutton":
+                    {
+                        // Same effect as clicking the ribbon button: posts the add-in command by its ribbon command id.
+                        var cid = RevitCommandId.LookupCommandId("CustomCtrl_%CustomCtrl_%FreeField%Export%ExportBundle");
+                        uiapp.PostCommand(cid);
+                        Save(outDir, "spike-clickbutton.json", new { posted = true });
+                        break;
+                    }
+                    case "showdialog":
+                    {
+                        // Opens the real dialog modally (valid API context for its Export button). The result file is written first so a caller
+                        // polling for it is released; Entry overwrites it when the dialog closes. Used by tools/scripts/ui-drive.ps1 -ViaJob.
+                        if (job.ResultFile != null) File.WriteAllText(job.ResultFile, "{ \"status\": \"dialog-open\" }");
+                        new ExportDialog(doc).ShowDialog();
+                        break;
+                    }
                     case "views": Save(outDir, "spike-views.json", Views(doc)); break;
                     case "mksheets": Save(outDir, "spike-mksheets.json", MakeSheets(doc, job, outDir)); break;
                     case "pdf": Save(outDir, "spike-pdf-" + job.Opt("sheet", "x") + ".json", Pdf(doc, job, outDir)); break;

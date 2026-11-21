@@ -59,7 +59,8 @@ public sealed class SheetRow
     public string StatusText { get; init; } = "";
     public bool Selected { get; set; }
     public bool IsMappable => Status == MapStatus.Mapped;
-    public string PlansText => string.Join(", ", Plans.Select(p => p.ViewName + (p.Primary && Plans.Count(q => q.LevelName == p.LevelName) > 1 ? " (primary)" : "")));
+    /// <summary>Only the floor-plan views that count (mapped types); legends, elevations, schedules and unmapped plan types are not listed.</summary>
+    public string PlansText => string.Join(", ", Plans.Where(p => p.Status != MapStatus.NotMappable).Select(p => p.ViewName + (p.Primary && Plans.Count(q => q.Status != MapStatus.NotMappable && q.LevelName == p.LevelName) > 1 ? " (primary)" : "")));
     public string LevelsText => string.Join(", ", Plans.Where(p => p.StoreyName != null).Select(p => p.LevelName + " → " + p.StoreyName).Distinct());
 }
 
@@ -147,11 +148,18 @@ public sealed class SheetSelectionModel
         }
         Sheets = rows.OrderBy(r => r.Sheet.Number, StringComparer.OrdinalIgnoreCase).ToList();
 
+        // Unplaced floor-plan views are extras: checked by default only for levels that no default-selected sheet already covers.
+        // The default is computed once; unchecking a sheet later never auto-checks views.
+        var coveredLevels = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var r in rows.Where(r => r.Selected))
+            foreach (var p in r.Plans.Where(p => p.Status == MapStatus.Mapped && p.LevelName != null)) coveredLevels.Add(p.LevelName!);
         var vrows = new List<ViewRow>();
         foreach (var v in unplacedPlanViews.Where(v => IsPlanType(v.ViewType)))
         {
             var (st, txt, storey) = Classify(v.ViewType, v.LevelName);
-            vrows.Add(new ViewRow { ViewId = v.ViewId, ViewName = v.ViewName, ViewType = v.ViewType, LevelName = v.LevelName, StoreyName = storey, Status = st, StatusText = txt, Selected = st == MapStatus.Mapped, ModelAreaM2 = v.ModelAreaM2 });
+            bool covered = st == MapStatus.Mapped && v.LevelName != null && coveredLevels.Contains(v.LevelName);
+            if (covered) txt += " (level already on a sheet)";
+            vrows.Add(new ViewRow { ViewId = v.ViewId, ViewName = v.ViewName, ViewType = v.ViewType, LevelName = v.LevelName, StoreyName = storey, Status = st, StatusText = txt, Selected = st == MapStatus.Mapped && !covered, ModelAreaM2 = v.ModelAreaM2 });
         }
         Views = vrows.OrderBy(r => r.ViewName, StringComparer.OrdinalIgnoreCase).ToList();
 
@@ -213,6 +221,6 @@ public sealed class SheetSelectionModel
     public string SummaryLine(double rvtMb = 0)
     {
         var s = Summary(rvtMb);
-        return $"{s.Sheets} sheets · {s.Levels} levels mapped · {s.Views} views not on sheets · est. {s.EstimatedMb:0.#} MB";
+        return $"{s.Sheets} sheets · {s.Levels} levels · {s.Views} extra views · est. {s.EstimatedMb:0.#} MB";
     }
 }

@@ -34,7 +34,33 @@ public class SheetSelectionModelTests
     {
         var m = Model();
         Assert.Equal(new[] { "A101", "S201" }, m.SelectedSheets.Select(s => s.Sheet.Number).ToArray());
-        Assert.Equal(new[] { "u1" }, m.SelectedViews.Select(v => v.ViewId).ToArray());
+        // u1 is on L2, which sheet S201 already covers -> listed but unchecked; u2 (Roof) is not mappable; nothing is checked by default
+        Assert.Empty(m.SelectedViews);
+        var u1 = m.Views.First(v => v.ViewId == "u1");
+        Assert.Equal(MapStatus.Mapped, u1.Status);
+        Assert.EndsWith("(level already on a sheet)", u1.StatusText);
+    }
+
+    [Fact]
+    public void UnplacedView_CheckedWhenNoSheetCoversItsLevel()
+    {
+        var sheets = new[] { new SheetInfo { Id = "s1", Number = "A101", Name = "First", Viewports = { Vp("v1", "FloorPlan", "L1") } } };
+        var views = new[] { Vp("u1", "FloorPlan", "L1"), Vp("u2", "FloorPlan", "L2") };
+        var m = new SheetSelectionModel(sheets, views, Levels());
+        Assert.Equal(new[] { "u2" }, m.SelectedViews.Select(v => v.ViewId).ToArray());
+        // default is computed once: clearing the sheet does not auto-check u1
+        m.Sheets[0].Selected = false; m.RefreshLevels();
+        Assert.False(m.Views.First(v => v.ViewId == "u1").Selected);
+    }
+
+    [Fact]
+    public void PlansColumn_ListsOnlyMappedFloorPlanViews()
+    {
+        var sheets = new[] { new SheetInfo { Id = "s1", Number = "A106", Name = "Roof", Viewports = { Vp("v1", "FloorPlan", "L1", 500, "Plan"), Vp("c1", "CeilingPlan", "L1", 100, "RCP"), Vp("e1", "Elevation", null, 10, "Elev"), Vp("l1", "Legend", null, 10, "Leg") } } };
+        var m = new SheetSelectionModel(sheets, Array.Empty<ViewportInfo>(), Levels());
+        Assert.Equal("Plan", m.Sheets[0].PlansText);
+        var m2 = new SheetSelectionModel(sheets, Array.Empty<ViewportInfo>(), Levels(), new SelectionOptions { MapCeilingAndAreaPlans = true });
+        Assert.Contains("RCP", m2.Sheets[0].PlansText);
     }
 
     [Fact]
@@ -59,7 +85,9 @@ public class SheetSelectionModelTests
         var m = Model(new SelectionOptions { MapCeilingAndAreaPlans = true });
         Assert.Equal(MapStatus.Mapped, m.Sheets.First(s => s.Sheet.Number == "A501").Status);
         Assert.Contains("A501", m.SelectedSheets.Select(s => s.Sheet.Number));
-        Assert.Contains("u3", m.SelectedViews.Select(v => v.ViewId));
+        // u3 (ceiling plan on L1) is mapped now, but sheet A101 already covers L1 -> listed, unchecked
+        Assert.Equal(MapStatus.Mapped, m.Views.First(v => v.ViewId == "u3").Status);
+        Assert.DoesNotContain("u3", m.SelectedViews.Select(v => v.ViewId));
     }
 
     [Fact]
@@ -96,7 +124,7 @@ public class SheetSelectionModelTests
     public void SummaryLine_Counts()
     {
         var m = Model();
-        Assert.StartsWith("2 sheets · 2 levels mapped · 1 views not on sheets · est. ", m.SummaryLine());
+        Assert.StartsWith("2 sheets · 2 levels · 0 extra views · est. ", m.SummaryLine());
     }
 
     [Theory]

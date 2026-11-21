@@ -125,13 +125,15 @@ public sealed class ExportDialog : Window
         g.Columns.Add(new DataGridTemplateColumn { Header = "", Width = 34, CellTemplate = new DataTemplate { VisualTree = cb } });
         g.Columns.Add(new DataGridTextColumn { Header = view ? "Type" : "Sheet", Binding = new Binding(nameof(RowVm.Number)), IsReadOnly = true, Width = 84 });
         g.Columns.Add(new DataGridTextColumn { Header = view ? "View name" : "Sheet name", Binding = new Binding(nameof(RowVm.Name)), IsReadOnly = true, Width = new DataGridLength(1.3, DataGridLengthUnitType.Star) });
-        g.Columns.Add(new DataGridTextColumn { Header = "Floor plan view(s)", Binding = new Binding(nameof(RowVm.Plans)), IsReadOnly = true, Width = new DataGridLength(1.4, DataGridLengthUnitType.Star) });
+        if (!view) g.Columns.Add(new DataGridTextColumn { Header = "Floor plan view(s)", Binding = new Binding(nameof(RowVm.Plans)), IsReadOnly = true, Width = new DataGridLength(1.4, DataGridLengthUnitType.Star) });
         g.Columns.Add(new DataGridTextColumn { Header = "Level → IFC storey", Binding = new Binding(nameof(RowVm.Levels)), IsReadOnly = true, Width = new DataGridLength(1.2, DataGridLengthUnitType.Star) });
         var st = new FrameworkElementFactory(typeof(TextBlock));
         st.SetBinding(TextBlock.TextProperty, new Binding(nameof(RowVm.Status)));
         st.SetBinding(TextBlock.ForegroundProperty, new Binding(nameof(RowVm.StatusBrush)));
         st.SetValue(TextBlock.MarginProperty, new Thickness(4, 0, 4, 0));
-        g.Columns.Add(new DataGridTemplateColumn { Header = "Status", Width = new DataGridLength(1.4, DataGridLengthUnitType.Star), CellTemplate = new DataTemplate { VisualTree = st } });
+        st.SetBinding(TextBlock.ToolTipProperty, new Binding(nameof(RowVm.Status)));
+        st.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+        g.Columns.Add(new DataGridTemplateColumn { Header = "Status", Width = new DataGridLength(view ? 3 : 1.6, DataGridLengthUnitType.Star), CellTemplate = new DataTemplate { VisualTree = st } });
         AutomationProperties.SetName(g, view ? "Floor plan views not on sheets" : "Sheets");
         return g;
     }
